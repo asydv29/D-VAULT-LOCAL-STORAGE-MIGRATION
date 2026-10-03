@@ -169,7 +169,7 @@ function render(){
   $$(".short-slide").forEach(wireSlide);
 }
 
-function ensureLoaded(i){
+async function ensureLoaded(i){
   for(const j of [i-1,i,i+1,i+2,i+3,i+4]){
     const slide=feed.children[j];
     if(!slide)continue;
@@ -179,7 +179,14 @@ function ensureLoaded(i){
       v.defaultMuted=muted;
       v.preload="auto";
       v.playbackRate=speed;
-      v.src=v.dataset.src;
+      // D Vault local media should bypass the compatibility /api stream route
+      // whenever possible. A direct Blob URL lets the browser use its native
+      // local-file media pipeline and avoids Range/fetch timing issues that
+      // can prevent Shorts from reaching loadeddata/playing.
+      const id=slide.dataset.id;
+      let src=null;
+      try{src=await window.DVaultMedia?.url(id)}catch{}
+      v.src=src||v.dataset.src;
       v.load();
     }
   }

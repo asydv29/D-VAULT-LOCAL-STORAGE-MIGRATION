@@ -105,7 +105,6 @@
       <span class="side-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h11v2H4V5Zm0 4.5h11v2H4v-2ZM4 13h7v2H4v-2Zm13-1v8l6-4-6-4Z"/></svg></span>
       <span>Watch later</span>
     </a>
-    <div class="side-divider"></div>
     <div class="side-small" id="accountStatus">Local storage vault</div>
     `;
   }

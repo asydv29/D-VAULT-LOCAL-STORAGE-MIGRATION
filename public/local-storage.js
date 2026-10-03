@@ -34,9 +34,16 @@
   async function del(store,key){return tx(store,"readwrite",s=>s.delete(key))}
   async function all(store){const d=await db();return new Promise((res,rej)=>{const r=d.transaction(store).objectStore(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
 
+  // Batch helpers: one transaction for many reads/writes instead of one each.
+  async function putMany(store,values){if(!values.length)return;return tx(store,"readwrite",s=>{for(const v of values)s.put(v)})}
+  async function allKeys(store){const d=await db();return new Promise((res,rej)=>{const r=d.transaction(store).objectStore(store).getAllKeys();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
+  async function getMany(store,keys){const d=await db();return new Promise((res,rej)=>{const t=d.transaction(store),s=t.objectStore(store),out=new Array(keys.length);keys.forEach((k,i)=>{s.get(k).onsuccess=e=>{out[i]=e.target.result}});t.oncomplete=()=>res(out);t.onerror=()=>rej(t.error)})}
+  async function delMany(store,keys){if(!keys.length)return;return tx(store,"readwrite",s=>{for(const k of keys)s.delete(k)})}
+
   const KEY="root";
   async function getRoot(){return (await get("handles",KEY))?.handle||null}
   async function setRoot(handle,name){
+    try{navigator.storage?.persist?.()}catch{}
     await put("handles",{key:KEY,handle,name:name||handle?.name||"Selected folder",updatedAt:Date.now()});
     await put("settings",{key:"active",name:name||handle?.name||"Selected folder",selectedAt:Date.now()});
   }
@@ -167,13 +174,28 @@
       await Promise.resolve(window.DVaultAndroid.renameFile(active.token,record.relativePath,newName));
       return;
     }
-    const fh=await fileHandleFor(record), file=await fh.getFile();
-    const parts=record.relativePath.split("/");parts.pop();
-    let dir=active.handle;for(const p of parts.filter(Boolean))dir=await dir.getDirectoryHandle(p);
-    if(typeof fh.move==="function"){await fh.move(newName);return}
-    const target=await dir.getFileHandle(newName,{create:true}),w=await target.createWritable();
-    await w.write(file);await w.close();
-    await dir.removeEntry(record.name);
+    const fh=await fileHandleFor(record);
+    if(!fh)throw new Error("Local file is not accessible.");
+    const file=await fh.getFile();
+    const parts=String(record.relativePath||"").split("/").filter(Boolean);
+    const oldBase=parts.pop();
+    let dir=active.handle;
+    for(const p of parts)dir=await dir.getDirectoryHandle(p);
+    // FileSystemFileHandle.move() is not consistently supported on Android/Chrome
+    // and can throw "The object can not be modified in this way.". Use the
+    // standards-compatible copy-then-delete operation instead.
+    if(oldBase===newName)return;
+    const target=await dir.getFileHandle(newName,{create:true});
+    const w=await target.createWritable();
+    try{
+      await w.write(file);
+      await w.close();
+    }catch(e){
+      try{await w.abort?.()}catch{}
+      throw e;
+    }
+    // Only remove the original after the new file has been written successfully.
+    await dir.removeEntry(oldBase);
   }
 
   async function deleteFile(record){
@@ -198,7 +220,7 @@
   }
   async function scan(){return window.DVaultAPI?.scan?window.DVaultAPI.scan():[]}
   window.DVaultStorage={
-    db,get,put,del,all,selectFolder,getRoot,getActive,ensurePermission,scan,listFiles,getFile,fileFor,getFileUrl,getMetadata,saveMetadata,deleteFile,renameFile,createFolder,exists,fileHandleFor,
+    db,get,put,del,all,putMany,allKeys,getMany,delMany,selectFolder,getRoot,getActive,ensurePermission,scan,listFiles,getFile,fileFor,getFileUrl,getMetadata,saveMetadata,deleteFile,renameFile,createFolder,exists,fileHandleFor,
     async clearRoot(){await del("handles",KEY);await del("settings","androidRoot")},
     isBrowserSupported:()=>!!window.showDirectoryPicker,
     isAndroidBridge:()=>!!(window.DVaultAndroid&&typeof window.DVaultAndroid.pickFolder==="function")

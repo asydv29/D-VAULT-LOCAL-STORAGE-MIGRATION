@@ -2,7 +2,7 @@
    Uses HTMLVideoElement + Canvas and caches only derived preview assets in IndexedDB. */
 (function(){
   "use strict";
-  const VERSION=2;
+  const VERSION=3;
   const VIDEO_EXT=/\.(mp4|webm|mkv|mov|m4v|avi|ts|mts|m2ts)$/i;
   const IMAGE_EXT=/\.(jpe?g|png|webp|gif)$/i;
   const meta=()=>window.DVaultStorage;
@@ -37,7 +37,7 @@
     return v;
   }
   function waitMeta(v){return new Promise((res,rej)=>{if(v.readyState>=1&&isFinite(v.duration))return res();const ok=()=>{cleanup();res()};const bad=()=>{cleanup();rej(new Error("Video metadata unavailable"))};const cleanup=()=>{v.removeEventListener("loadedmetadata",ok);v.removeEventListener("error",bad)};v.addEventListener("loadedmetadata",ok,{once:true});v.addEventListener("error",bad,{once:true});setTimeout(()=>{cleanup();rej(new Error("Video metadata timeout"))},12000)})}
-  function seek(v,t){return new Promise((res,rej)=>{let done=false;const finish=()=>{if(done)return;done=true;clearTimeout(timer);v.removeEventListener("seeked",finish);v.removeEventListener("error",bad);res()};const bad=()=>{if(done)return;done=true;clearTimeout(timer);v.removeEventListener("seeked",finish);res()};const timer=setTimeout(finish,4500);v.addEventListener("seeked",finish,{once:true});v.addEventListener("error",bad,{once:true});try{v.currentTime=clamp(t,0,Math.max(0,v.duration-.05))}catch{finish()}})}
+  function seek(v,t,timeout=1400){return new Promise((res)=>{let done=false;const finish=()=>{if(done)return;done=true;clearTimeout(timer);v.removeEventListener("seeked",finish);v.removeEventListener("error",bad);res(true)};const bad=()=>{if(done)return;done=true;clearTimeout(timer);v.removeEventListener("seeked",finish);res(false)};const timer=setTimeout(()=>{if(done)return;done=true;v.removeEventListener("seeked",finish);v.removeEventListener("error",bad);res(false)},timeout);v.addEventListener("seeked",finish,{once:true});v.addEventListener("error",bad,{once:true});try{const t2=clamp(t,0,Math.max(0,v.duration-.05));if(typeof v.fastSeek==="function")v.fastSeek(t2);else v.currentTime=t2}catch{bad()}})}
   async function frameAt(v,t,w=320,h=180){
     await seek(v,t);await sleep(20);
     if(!v.videoWidth||!v.videoHeight)throw new Error("No decodable video frame");
@@ -87,17 +87,30 @@
     const existing=await meta().get("assets",id+":sprite:"+VERSION);
     if(existing&&!force)return r.sprite||{ready:true};
     let file=null;try{file=r.native&&r.url?r.url:await meta().fileFor(r)}catch{return null}
-    const v=makeVideo(file);try{
-      await waitMeta(v);const n=frameCount(v.duration);
+    const v=makeVideo(file);let spriteUrl=null;
+    try{
+      await waitMeta(v);
+      const target=frameCount(v.duration);
+      // Generate a deliberately small first-pass sprite. This makes the
+      // timeline usable quickly; on slower devices we avoid hundreds of
+      // expensive random seeks. The target is still adaptive, but capped
+      // for memory/decoder speed.
+      const n=Math.min(target, /Android|iPhone|iPad/i.test(navigator.userAgent)?36:60);
       const fw=160,fh=Math.max(90,Math.round(fw*(v.videoHeight/v.videoWidth||.5625))),cols=10,rows=Math.ceil(n/cols);
-      const c=document.createElement("canvas");c.width=fw*cols;c.height=fh*rows;const x=c.getContext("2d");
+      const c=document.createElement("canvas");c.width=fw*cols;c.height=fh*rows;const x=c.getContext("2d",{alpha:false});
       x.fillStyle="#111";x.fillRect(0,0,c.width,c.height);
+      v.pause();v.muted=true;v.playsInline=true;
       for(let i=0;i<n;i++){
-        const t=(v.duration-.2)*((i+.5)/n);
-        try{await seek(v,t);x.drawImage(v,(i%cols)*fw,Math.floor(i/cols)*fh,fw,fh)}catch{}
-        if(i%10===9)await sleep(0);
+        const t=Math.max(0,(v.duration-.25)*((i+.5)/n));
+        const ok=await seek(v,t,1200);
+        if(ok&&v.videoWidth){
+          try{x.drawImage(v,(i%cols)*fw,Math.floor(i/cols)*fh,fw,fh)}catch{}
+        }
+        // Yield between frames so playback/UI/input always gets a turn.
+        if((i&3)===3)await new Promise(requestAnimationFrame);
       }
-      const blob=await new Promise(res=>c.toBlob(res,"image/webp",.78));
+      const blob=await new Promise(res=>c.toBlob(res,"image/webp",.72));
+      if(!blob)throw new Error("Sprite encoding failed");
       await meta().put("assets",{key:id+":sprite:"+VERSION,type:"sprite",id,blob,version:VERSION});
       r.sprite={ready:true,frameCount:n,frameWidth:fw,frameHeight:fh,columns:cols,rows,intervalSeconds:v.duration/n,version:VERSION};
       r.spriteStatus="ready";r.previewVersion=VERSION;await saveMeta(r);window.dispatchEvent(new CustomEvent("dvault:sprite-ready",{detail:{id}}));
@@ -107,16 +120,26 @@
   }
   async function ensureHover(id){const r=await recordFor(id);return r?.duration?{duration:r.duration}:null}
   const queue=[];let running=0;
+  function mobileDevice(){return /Android|iPhone|iPad/i.test(navigator.userAgent)}
   function concurrency(){
     const c=navigator.hardwareConcurrency||4;
     const mem=navigator.deviceMemory||4;
-    if(/Android|iPhone|iPad/i.test(navigator.userAgent))return Math.max(1,Math.min(2,Math.floor(c/3)));
-    return Math.max(2,Math.min(4,Math.floor(c/2),mem>=8?4:3));
+    if(mobileDevice())return 1;
+    return Math.max(1,Math.min(2,Math.floor(c/2),mem>=8?2:1));
   }
-  async function pump(){while(running<concurrency()&&queue.length){const j=queue.shift();running++;(async()=>{try{await ensureThumbnail(j.id);await ensureSprite(j.id)}catch{}finally{running--;pump()}})()}}
+  let playbackActive=false;
+  async function pump(){
+    if(playbackActive)return;
+    while(running<concurrency()&&queue.length&&!playbackActive){
+      const j=queue.shift();running++;
+      (async()=>{try{await ensureThumbnail(j.id);if(!playbackActive)await ensureSprite(j.id)}catch{}finally{running--;pump()}})()
+    }
+  }
+  function setPlaybackActive(v){playbackActive=!!v;if(!playbackActive)pump()}
+
   function enqueue(id,priority=10){const existing=queue.find(x=>x.id===id);if(existing){if(priority<existing.priority)existing.priority=priority;queue.sort((a,b)=>a.priority-b.priority);pump();return}queue.push({id,priority});queue.sort((a,b)=>a.priority-b.priority);pump()}
   function prioritize(id){enqueue(id,0)}
-  window.DVaultPreview={VERSION,ensureThumbnail,ensureSprite,ensureHover,enqueue,prioritize,frameCount,
+  window.DVaultPreview={VERSION,ensureThumbnail,ensureSprite,ensureHover,enqueue,prioritize,frameCount,setPlaybackActive,
     async asset(id,type){return meta().get("assets",id+":"+type+":"+VERSION)},
     async invalidate(id){for(const k of ["thumbnail","sprite"])await meta().del("assets",id+":"+k+":"+VERSION).catch(()=>{});const r=await recordFor(id);if(r){r.thumbnail=null;r.sprite=null;await saveMeta(r)}}
   };

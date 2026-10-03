@@ -334,7 +334,8 @@ async function main(){
  // gets immediately paused again, guaranteeing playback never starts
  // until they ask for it.
  let allowAutoplay=false;
- v.addEventListener("play",()=>{if(!allowAutoplay)v.pause()});
+ v.addEventListener("play",()=>{if(!allowAutoplay){v.pause();return}window.DVaultPreview?.setPlaybackActive?.(true)});
+ v.addEventListener("pause",()=>{window.DVaultPreview?.setPlaybackActive?.(false)});
  const fileName=String(vinfo.title||"").toLowerCase();
  const isTs=/\.(ts|mts|m2ts)$/.test(fileName);
  const tsStatus=$("#tsStatus");
@@ -2494,4 +2495,4 @@ async function main(){
  });
  ui();volui();
 }
-main().catch(e=>document.body.innerHTML='<main class="error-page"><h2>'+esc(e.message)+'</h2><a href="/">← Back to D Vault</a></main>');
+(window.DVaultBootstrap?window.DVaultBootstrap.ready():Promise.resolve()).then(main).catch(e=>document.body.innerHTML='<main class="error-page"><h2>'+esc(e.message)+'</h2><a href="/">← Back to D Vault</a></main>');

@@ -25,7 +25,9 @@
   }
   function previewWindow(d){d=Number(d)||0;if(d<600)return 30;if(d<1200)return 40;if(d<2400)return 50;return 60}
   function start(vid,card,startAt=0,fromRight=false){
-    if(!vid.dataset.src)return;
+    // Local D Vault cards intentionally do not need a network data-src.
+    // They expose data-local-id and their object URL is assigned by wire().
+    if(!vid.dataset.src && !vid.dataset.localId && !vid.src)return;
     if(active&&active.vid!==vid)active.stop();
     if(vid._dpEnded)vid.removeEventListener('ended',vid._dpEnded);
     const finish=()=>{clearTimeout(vid._dpPreviewTimer);vid._dpPreviewTimer=null;stop(vid,card)};vid._dpEnded=finish;vid.addEventListener('ended',finish,{once:true});
@@ -59,7 +61,11 @@
       if(hover){
         if(vid.dataset.dpHover)return;vid.dataset.dpHover='1';
         let timer=null;
-        card.addEventListener('mouseenter',()=>{clearTimeout(timer);if(active?.vid===vid)return;card.classList.add('loading');timer=setTimeout(async()=>{try{vid.src=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):vid.dataset.src;vid.preload='auto';card.classList.remove('loading');start(vid,card,0)}catch{card.classList.remove('loading')}},180)});
+        card.addEventListener('mouseenter',()=>{clearTimeout(timer);if(active?.vid===vid)return;card.classList.add('loading');timer=setTimeout(async()=>{try{
+          const src=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):vid.dataset.src;
+          if(!src)throw new Error('No local or remote preview source');
+          vid.src=src;vid.preload='auto';card.classList.remove('loading');start(vid,card,0);
+        }catch{card.classList.remove('loading')}},180)});
         card.addEventListener('mouseleave',()=>{clearTimeout(timer);if(active?.vid===vid)return;card.classList.remove('loading');if(vid.src){vid.removeAttribute('src');vid.load()}});
       }else{
         if(vid.dataset.dpTouch)return;vid.dataset.dpTouch='1';
@@ -97,10 +103,20 @@
           let done=false;
           const revUrl=vid.dataset.srcRev;
           const begin=()=>{if(done||my!==gid)return;done=true;if(reverse)runReverse();else{card.querySelector('.thumb-loadbar')?.classList.remove('from-right');start(vid,card,0)}};
-          const attach=async(src,onMeta)=>{if(my!==gid)return;try{vid.src=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):src;vid.preload='auto';vid.addEventListener('loadedmetadata',onMeta,{once:true});if(vid.readyState>=1)onMeta()}catch{}};
+          const attach=async(src,onMeta)=>{if(my!==gid)return;try{
+            const resolved=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):src;
+            if(!resolved)throw new Error('No local or remote preview source');
+            vid.src=resolved;vid.preload='auto';vid.addEventListener('loadedmetadata',onMeta,{once:true});if(vid.readyState>=1)onMeta();
+          }catch{}};
           if(!reverse)attach(vid.dataset.src,begin);
           else{
-            const seekFallback=()=>getBlobSrc(vid.dataset.src).then(u=>attach(u,begin),()=>attach(vid.dataset.src,begin));
+            const seekFallback=async()=>{
+              if(window.DVaultMedia&&vid.dataset.localId){
+                try{await attach(await DVaultMedia.url(vid.dataset.localId),begin);return}catch{}
+              }
+              if(!vid.dataset.src)return;
+              getBlobSrc(vid.dataset.src).then(u=>attach(u,begin),()=>attach(vid.dataset.src,begin));
+            };
             if(revUrl&&!revFailed.has(revUrl)){
               // Pre-reversed clip: plays forward = smooth. Line grows from the right.
               getBlobSrc(revUrl).then(u=>{

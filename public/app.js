@@ -925,43 +925,41 @@ function loadHomeCache(){
   }catch{return null}
 }
 
-// ---- Offline fallback: when there's no connection, show what's already
-// saved in this browser's in-app storage (IndexedDB) instead of an error
-// or bouncing the user to the sign-in page. See idb-downloads.js. ----
+// ---- Offline fallback: show the selected local D Vault library through IndexedDB/local-api.js. ----
 let offlineUrls=[];
 function revokeOfflineUrls(){offlineUrls.forEach(u=>URL.revokeObjectURL(u));offlineUrls=[]}
 async function showOfflineHome(){
   firstLoadDone=true;
-  if(window.MyTubeOffline)MyTubeOffline.showBanner("You're offline — showing your downloaded videos.");
-  $('#accountStatus').textContent="You're offline";
+  if(window.MyTubeOffline)MyTubeOffline.showBanner("You're offline — showing your local D Vault library.");
+  $('#accountStatus').textContent="Offline • Local storage";
   revokeOfflineUrls();
-  if(!window.AppDownloads){
-    $('#grid').innerHTML=renderEmpty('⚠','You\'re offline','Reconnect to the internet to load your videos.');
-    return;
+
+  // Local-first offline mode: use the selected folder and IndexedDB metadata
+  // through local-api.js. This does not depend on downloaded copies or the
+  // network Worker.
+  try{
+    const vs=await api(folderVideosUrl());
+    all=(Array.isArray(vs)?vs:[]).filter(v=>!v.isFolder);
+    pruneCardCache();
+    if(!recSeed.length)shuffleRecommendations();
+    render();
+    if(!all.length){
+      $('#grid').innerHTML=renderEmpty('📁','No local media found','Choose a storage folder containing your videos and refresh the library.');
+    }
+  }catch(err){
+    all=[];
+    $('#grid').innerHTML=renderEmpty('⚠','Local storage unavailable',err?.message||'Choose your D Vault storage folder again.');
   }
-  let items=[];
-  try{items=await AppDownloads.listVideos()}catch{}
-  if(!items.length){
-    $('#grid').innerHTML=renderEmpty('📲','You\'re offline','No downloaded videos yet. While you\'re online, use "Download offline" (or Save on a Short) so videos are here next time you\'re offline.');
-    return;
-  }
-  items.sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));
-  $('#grid').innerHTML=items.map(it=>{
-    let posterUrl='';
-    if(it.poster){posterUrl=URL.createObjectURL(it.poster);offlineUrls.push(posterUrl)}
-    const href='/watch.html?id='+encodeURIComponent(it.id);
-    return `<article class="video-card"><a class="thumb" target="_top" href="${href}" data-watch="${esc(it.id)}">${posterUrl?`<img src="${posterUrl}" alt="">`:'<div class="no-poster" style="display:flex;align-items:center;justify-content:center;height:100%;background:#1c1c1c;color:#666;font-size:34px">▶</div>'}<span class="thumb-play">▶</span></a><div class="card-row"><div class="channel-avatar">${esc((it.title||'M').trim()[0].toUpperCase())}</div><div class="card-body"><a class="video-title" target="_top" href="${href}" data-watch="${esc(it.id)}">${esc(it.title||'Untitled video')}</a><p class="channel">D Vault</p><p class="stats">${['Downloaded',fmtSize(it.size),'available offline'].filter(Boolean).join(' · ')}</p></div></div></article>`;
-  }).join('');
-  document.querySelectorAll('[data-watch]').forEach(a=>a.addEventListener('click',()=>addHistory(a.dataset.watch)));
 }
+
 function renderEmpty(icon,title,text){return `<div class="empty-state"><div class="empty-icon">${icon}</div><h2>${title}</h2><p>${text}</p></div>`}
 
 // `load()` used to run the sign-in check and the video fetch in one big
 // try/catch, so ANY failure while fetching videos from Drive (a slow/cold
 // Drive token refresh, a transient Drive error, etc.) - even though the user was
 // properly signed in - got misreported as "you're not signed in" and
-// bounced the user straight back to /settings.html. Now only an actual 401
-// from the server sends you to the sign-in page; other errors show inline.
+// bounced the user straight back to /settings.html. Local mode now keeps the
+// library available offline; only unsupported/permission errors are shown inline.
 // A connectivity failure (offline, or a fetch that never reached the
 // server at all) never redirects — it falls back to showOfflineHome().
 async function load(silent){
@@ -1025,6 +1023,7 @@ async function load(silent){
 }
 window.addEventListener('offline',()=>{if(firstLoadDone)showOfflineHome()});
 window.addEventListener('online',()=>{load()});
+window.addEventListener('dvault:library-changed',()=>{if(firstLoadDone&&!selected.size)load(true)});
 $('#searchForm').onsubmit=e=>{e.preventDefault();syncSearchUrl();render()};let searchTimer=0;$('#search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{syncSearchUrl();render()},120)};document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');activeCat=b.dataset.cat;render()});
 // Home filter tabs: All / Videos / Shorts switch the grid in place;
 // Photos hands off to the dedicated Photos page (a separate library).

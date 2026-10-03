@@ -33,6 +33,9 @@
   var inflight = 0;
 
   function warm(id, opts) {
+    // Media is local now: there is no server lookup to pre-warm, and the fake
+    // Range request made the page walk the folder tree on every hover/tap.
+    return;
     if (!id) return;
     id = String(id);
     if (shouldSkip(opts && opts.force)) return;

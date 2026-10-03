@@ -2565,3 +2565,6 @@ html body #likedToggle:focus-visible{
 .photo-viewer:fullscreen{background:#000}
 .photo-viewer:fullscreen .photo-viewer-img,
 .photo-viewer:fullscreen .photo-viewer-video{width:100vw;height:100vh;max-width:none;max-height:none;object-fit:contain;border-radius:0}
+
+/* D Vault: no profile/account avatar in any title bar. */
+.yt-topbar .avatar,.home-topbar .avatar,.topbar-icons .avatar{display:none!important}

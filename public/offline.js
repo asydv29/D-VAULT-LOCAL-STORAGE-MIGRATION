@@ -30,7 +30,7 @@
 
   function showBanner(text) {
     const el = ensureBannerEl();
-    el.textContent = text || "You're offline — showing what's downloaded.";
+    el.textContent = text || "You're offline — showing your local D Vault library.";
     el.hidden = false;
   }
 
