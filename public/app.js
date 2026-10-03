@@ -996,7 +996,7 @@ async function load(silent){
   if(window.MyTubeOffline)MyTubeOffline.hideBanner();
   
   window.DVaultStorage&&window.DVaultStorage.getActive().then(a=>{if(a)$('#accountStatus').textContent='Storage: '+a.name;});
-  if(me.email){const initial=((me.name||me.email||'').trim()[0]||'A').toUpperCase();const bn=$('#bnavAvatar');if(bn)bn.textContent=initial;const av=$('#avatarInitial');if(av)av.textContent=initial}
+  if(me.email){const initial=((me.name||me.email||'').trim()[0]||'A').toUpperCase();const av=$('#avatarInitial');if(av)av.textContent=initial}
   try{
     all=(await videosP).filter(v=>!v.isFolder);
     pruneCardCache();

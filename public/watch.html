@@ -93,6 +93,7 @@
   <div class="more-menu-panel" id="moreMenuMain">
     <button type="button" class="more-menu-item quality-item" id="qualityBtn" aria-label="Video quality">Original</button>
     <button type="button" class="more-menu-item" id="moreSpeedBtn"><span>Playback speed</span><span class="more-menu-value" id="moreSpeedValue">Normal</span></button>
+    <button type="button" class="more-menu-item" id="moreReverseBtn"><span>Reverse play</span><span class="more-menu-value" id="moreReverseValue">Off</span></button>
     <button type="button" class="more-menu-item" id="moreShortcutsBtn"><span>Keyboard shortcuts</span><span class="more-menu-icon more-menu-icon-svg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><line x1="6" y1="9" x2="6" y2="9"/><line x1="9.5" y1="9" x2="9.5" y2="9"/><line x1="13" y1="9" x2="13" y2="9"/><line x1="16.5" y1="9" x2="16.5" y2="9"/><line x1="6" y1="12.5" x2="6" y2="12.5"/><line x1="9.5" y1="12.5" x2="9.5" y2="12.5"/><line x1="13" y1="12.5" x2="13" y2="12.5"/><line x1="16.5" y1="12.5" x2="16.5" y2="12.5"/><line x1="8" y1="16" x2="16" y2="16"/></svg></span></button>
     <button type="button" class="more-menu-item" id="morePipBtn"><span>Picture in picture</span><span class="more-menu-icon more-menu-icon-svg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h5"/><rect x="13" y="13" width="8" height="6" rx="1.5"/></svg></span></button>
     <button type="button" class="more-menu-item" id="moreShortBtn"><span id="moreShortLabel">Mark as Short</span><img id="moreShortIcon" src="/icons/mark-as-shorts.svg" alt="" class="more-menu-icon shorts-menu-icon"></button>
@@ -127,7 +128,7 @@
   </div>
   <div id="recSentinel" class="rec-sentinel" aria-hidden="true"></div>
 </section>
-<script src="/offline.js"></script><script src="/autothumb.js"></script><script src="/idb-store.js"></script><script src="/idb-downloads.js"></script><script src="/offline-player.js"></script><script src="/preview.js"></script><script src="/details.js"></script><script src="/watch.js"></script>
+<script src="/offline.js"></script><script src="/autothumb.js"></script><script src="/idb-store.js"></script><script src="/idb-downloads.js"></script><script src="/offline-player.js"></script><script src="/preview.js"></script><script src="/details.js"></script><script src="/reverse-play.js"></script><script src="/watch.js"></script>
 <script>
 (function(){
   // Meta row beneath the title: quality badge + type + size + duration +

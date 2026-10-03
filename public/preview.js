@@ -2,6 +2,8 @@
 // One implementation shared by home/search/library cards and watch-page recommendations.
 (function(){
   let active=null;
+  const PREVIEW_SPEED=3; // both forward (start->end) and reverse (end->start) previews run at 3x
+
   const cardSelector='.thumb,.rec-thumb';
   function stop(vid,card){
     if(vid._dpEnded){vid.removeEventListener('ended',vid._dpEnded);vid._dpEnded=null}
@@ -34,8 +36,8 @@
     const finish=()=>{clearTimeout(vid._dpPreviewTimer);vid._dpPreviewTimer=null;stop(vid,card)};vid._dpEnded=finish;vid.addEventListener('ended',finish,{once:true});
     active={vid,card,stop:finish};
     const begin=()=>{try{vid.currentTime=Math.max(0,Math.min(Number(startAt)||0,(vid.duration||9)-.05))}catch(_){}
-      vid.muted=true;vid.playsInline=true;vid.loop=false;
-      vid.play().then(()=>{card.classList.add('previewing');trackBar(vid,card,fromRight,false);const left=Math.max(0,(Number(vid.duration)||0)-Math.max(0,Number(startAt)||0));vid._dpPreviewTimer=setTimeout(finish,Math.min(previewWindow(vid.duration),left)*1000)}).catch(()=>finish());
+      vid.muted=true;vid.playsInline=true;vid.loop=false;vid.defaultPlaybackRate=PREVIEW_SPEED;vid.playbackRate=PREVIEW_SPEED;
+      vid.play().then(()=>{card.classList.add('previewing');trackBar(vid,card,fromRight,false);const left=Math.max(0,(Number(vid.duration)||0)-Math.max(0,Number(startAt)||0))/PREVIEW_SPEED;vid._dpPreviewTimer=setTimeout(finish,Math.min(previewWindow(vid.duration),left)*1000)}).catch(()=>finish());
     };
     if(vid.readyState>=1)begin();else vid.addEventListener('loadedmetadata',begin,{once:true});
   }
@@ -64,7 +66,7 @@
     const [r,a]=await Promise.all([S.get('meta',id),P.asset(id,'sprite')]);
     if(!r||!r.sprite||!a||!a.blob)return null;
     const bmp=await createImageBitmap(a.blob);
-    const e={bmp,m:r.sprite,vw:Number(r.width)||0,vh:Number(r.height)||0};
+    const e={bmp,m:r.sprite,vw:Number(r.width)||0,vh:Number(r.height)||0,dur:Number(r.duration)||0};
     spriteCache.set(id,e);
     if(spriteCache.size>12){const k=spriteCache.keys().next().value,o=spriteCache.get(k);spriteCache.delete(k);try{o.bmp.close()}catch(_){}}
     return e;
@@ -80,7 +82,7 @@
     // The cell is letterboxed to the real video shape; crop that, then cover-fit the card.
     const vw=sp.vw||fw,vh=sp.vh||fh,sc=Math.min(fw/vw,fh/vh),cw=Math.max(1,vw*sc),ch=Math.max(1,vh*sc);
     const ar=W/H;let kw=cw,kh=ch;if(cw/ch>ar)kw=ch*ar;else kh=cw/ar;
-    const T=Math.min(5,Math.max(2.5,n*.1))*1000,t0=performance.now();let last=-1,raf=0;
+    const dur=sp.dur||(Number(vid.duration)||0),T=(dur>0?Math.max(500,dur/PREVIEW_SPEED*1000):Math.min(5,Math.max(2.5,n*.1))*1000),t0=performance.now();let last=-1,raf=0;
     const bar=card.querySelector('.thumb-loadbar');
     const finish=()=>{cancelAnimationFrame(raf);stop(vid,card)};
     active={vid,card,stop:finish};
@@ -132,7 +134,7 @@
           const onSeeked=()=>{
             if(active?.vid!==vid)return;
             clearTimeout(guard);
-            const now=performance.now();t-=(now-last)/1000;last=now;
+            const now=performance.now();t-=PREVIEW_SPEED*(now-last)/1000;last=now;
             if(t<=0){finish();return}
             revRaf=requestAnimationFrame(()=>{if(active?.vid!==vid)return;seekTo(t);guard=setTimeout(onSeeked,500)});
           };

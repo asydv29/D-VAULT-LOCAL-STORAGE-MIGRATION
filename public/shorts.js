@@ -194,7 +194,7 @@ async function ensureLoaded(i){
 
 function updateCenterIcon(slide,v){
   const icon=slide.querySelector(".short-center-icon");
-  const playing=!v.paused&&!v.ended;
+  const playing=(!v.paused&&!v.ended)||!!window.DVReverse?.isActive(v);
   icon.classList.toggle("hidden",playing);
 }
 
@@ -203,7 +203,7 @@ function activateSlide(i,slideEl){
   const prevSlide=activeIndex>=0?feed.children[activeIndex]:null;
   if(prevSlide){
     const pv=prevSlide.querySelector("video");
-    if(pv)pv.pause();
+    if(pv){window.DVReverse?.stop(pv,true);pv.pause()}
   }
   activeIndex=i;
   ensureLoaded(i);
@@ -324,6 +324,7 @@ function wireSlide(slide){
     return Math.min(window.innerWidth,window.innerHeight)>=600;
   }
   function togglePlayback(){
+    if(window.DVReverse?.isActive(v)){DVReverse.stop(v);updateCenterIcon(slide,v);return}
     if(v.paused||v.ended)v.play().catch(()=>{});else v.pause();
   }
 
@@ -498,6 +499,7 @@ function wireSlide(slide){
     progressBar.classList.add("dragging");
     showUI();
     wasPlayingBeforeDrag=!v.paused&&!v.ended;
+    window.DVReverse?.stop(v,true);
     v.pause();
     seekTo(ratioFromEvent(e));
     showPreview(e);
@@ -694,6 +696,16 @@ function openMoreMenu(slide){
 function closeMoreMenu(){moreMenu.hidden=true;menuBackdrop.hidden=true}
 menuBackdrop.onclick=closeMoreMenu;
 speedBtn.onclick=()=>showPanel(speedPanel);
+// Reverse play: from the current spot, or from the end if the Short is at its very start.
+$("#shortsReverseBtn").onclick=()=>{
+  const slide=currentMenuSlide||feed.children[activeIndex];
+  const v=slide&&slide.querySelector("video");
+  closeMoreMenu();
+  if(!v)return;
+  if(window.DVReverse?.isActive(v)){DVReverse.stop(v);updateCenterIcon(slide,v);return}
+  const ok=window.DVReverse?.start(v,()=>updateCenterIcon(slide,v));
+  if(ok)updateCenterIcon(slide,v);else toast("Short is not ready yet");
+};
 qualityBtn.onclick=()=>showPanel(qualityPanel);
 
 // ---- Details: everything known about the Short's file, gathered from the

@@ -52,33 +52,68 @@ function renderEmpty(){
 // briefly expired token. Retry twice with a growing delay before giving up;
 // if it still fails, swap in a plain placeholder icon instead of leaving
 // the browser's broken-image glyph in the grid forever.
-window.handlePhotoThumbFail=function(img){
-  const tries=Number(img.dataset.retries||0);
-  if(tries>=2){
-    img.style.display='none';
-    const tile=img.closest('.photo-tile');
-    if(tile&&!tile.querySelector('.photo-fallback-icon')){
-      const span=document.createElement('span');
-      span.className='photo-fallback-icon';
-      span.textContent=tile.querySelector('.photo-video-badge')?'▶':'🖼';
-      span.style.cssText='display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:28px;opacity:.5';
-      tile.prepend(span);
-    }
-    return;
+// Thumbnails for local photos are generated on demand by the local API, which
+// only answers window.fetch() calls (an <img src="/api/..."> request never goes
+// through it and 404s). So thumbs are loaded via fetch -> blob URL, a few at a
+// time, with fallbacks: API thumbnail -> the original image -> placeholder icon.
+const thumbQueue=[];let thumbActive=0;
+function pumpThumbs(){
+  while(thumbActive<3&&thumbQueue.length){
+    const job=thumbQueue.shift();thumbActive++;
+    job().finally(()=>{thumbActive--;pumpThumbs()});
   }
-  img.dataset.retries=String(tries+1);
-  setTimeout(()=>{
-    const sep=img.src.indexOf('?')===-1?'?':'&';
-    img.src=img.src.replace(/[?&]retry=\d+/,'')+sep+'retry='+Date.now();
-  },1200*(tries+1));
-};
+}
+function showPhotoFallback(img){
+  img.style.display='none';
+  const tile=img.closest('.photo-tile');
+  if(tile&&!tile.querySelector('.photo-fallback-icon')){
+    const span=document.createElement('span');
+    span.className='photo-fallback-icon';
+    span.textContent=tile.querySelector('.photo-video-badge')?'▶':'🖼';
+    span.style.cssText='display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:28px;opacity:.5';
+    tile.prepend(span);
+  }
+}
+function loadPhotoThumb(img){
+  const stage=Number(img.dataset.stage||0);
+  img.dataset.stage=String(stage+1);
+  const id=img.dataset.photoId;
+  const p=shown[Number(img.closest('.photo-tile')?.dataset.photoIndex)]||{};
+  if(stage===0){
+    thumbQueue.push(async()=>{
+      try{
+        const r=await fetch('/api/photos/'+encodeURIComponent(id)+'/thumbnail');
+        if(!r.ok)throw new Error('thumb '+r.status);
+        const b=await r.blob();if(!b.size)throw new Error('empty');
+        img.src=URL.createObjectURL(b);
+      }catch{loadPhotoThumb(img)}
+    });
+    pumpThumbs();
+  }else if(stage===1&&p.url){
+    // Thumbnail could not be generated (unusual format?) - let the browser try the original.
+    img.src=p.url;
+  }else showPhotoFallback(img);
+}
+window.handlePhotoThumbFail=function(img){loadPhotoThumb(img)};
+let thumbObserver=null;
+function observeThumbs(grid){
+  if(thumbObserver)thumbObserver.disconnect();
+  const lazy=[...grid.querySelectorAll('img[data-lazy-thumb]')];
+  if(!('IntersectionObserver' in window)){lazy.forEach(loadPhotoThumb);return}
+  thumbObserver=new IntersectionObserver(es=>es.forEach(e=>{
+    if(!e.isIntersecting)return;
+    thumbObserver.unobserve(e.target);loadPhotoThumb(e.target);
+  }),{rootMargin:'600px'});
+  lazy.forEach(i=>thumbObserver.observe(i));
+}
 function render(){
   const q=($('#photosSearch').value||'').trim().toLowerCase();
   shown=q?all.filter(p=>(p.title||'').toLowerCase().includes(q)):all.slice();
   $('#photosCount').textContent=shown.length?(shown.length+(shown.length===1?' photo':' photos')):'';
   const grid=$('#grid');
-  grid.innerHTML=shown.length?shown.map((p,i)=>`<button type="button" class="photo-tile" data-photo-index="${i}" aria-label="${esc(p.title)}"><img loading="lazy" decoding="async" src="${esc(p.thumb)}" alt="" onerror="window.handlePhotoThumbFail&&window.handlePhotoThumbFail(this)">${p.isVideo?'<span class="photo-video-badge">▶</span>':''}${p.liked?'<span class="photo-like-badge">♥</span>':''}</button>`).join(''):renderEmpty();
+  grid.innerHTML=shown.length?shown.map((p,i)=>`<button type="button" class="photo-tile" data-photo-index="${i}" aria-label="${esc(p.title)}"><img decoding="async" data-photo-id="${esc(p.id)}" ${String(p.thumb||'').startsWith('blob:')?`src="${esc(p.thumb)}"`:'data-lazy-thumb="1"'} alt="" onerror="window.handlePhotoThumbFail&&window.handlePhotoThumbFail(this)">${p.isVideo?'<span class="photo-video-badge">▶</span>':''}${p.liked?'<span class="photo-like-badge">♥</span>':''}</button>`).join(''):renderEmpty();
   grid.querySelectorAll('[data-photo-index]').forEach(b=>b.onclick=()=>openViewer(Number(b.dataset.photoIndex)));
+  observeThumbs(grid);
 }
 
 // Same idea as the Home page's instant-back cache: remember the last photo

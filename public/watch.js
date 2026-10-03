@@ -598,12 +598,12 @@ async function main(){
    suppressCenterPopTimer=setTimeout(()=>{suppressCenterPop=false},400);
  };
  const updateCenterVisibility=()=>{
-   const wantVisible=(v.paused||v.ended)&&!controls.classList.contains("auto-hidden");
+   const wantVisible=(v.paused||v.ended)&&!window.DVReverse?.isActive(v)&&!controls.classList.contains("auto-hidden");
    if(wantVisible&&suppressCenterPop){center.classList.add("hidden");return}
    center.classList.toggle("hidden",!wantVisible);
  };
  const ui=()=>{
-   const playing=!v.paused&&!v.ended;
+   const playing=(!v.paused&&!v.ended)||!!window.DVReverse?.isActive(v);
    playBtn.innerHTML=playing?PAUSE_SVG_SM:PLAY_SVG_SM;
    playBtn.setAttribute("aria-label",playing?"Pause":"Play");
    showControls();
@@ -619,7 +619,7 @@ async function main(){
    centerFlash.classList.add("pulse");
  };
  const togglePlayWithFlash=()=>{
-   flashCenter(v.paused||v.ended?PLAY_SVG:PAUSE_SVG);
+   flashCenter((v.paused||v.ended)&&!window.DVReverse?.isActive(v)?PLAY_SVG:PAUSE_SVG);
    play();
  };
  // Shared FFmpeg.wasm loader, reused by the .TS conversion flow, the
@@ -707,6 +707,7 @@ async function main(){
  };
  const play=async()=>{
    allowAutoplay=true;
+   if(window.DVReverse?.isActive(v)){DVReverse.stop(v);return}
    if(!v.paused){v.pause();return}
    if(isTs && !tsPrepared){
      const ok=await prepareTs();
@@ -1838,6 +1839,17 @@ async function main(){
  if(moreSpeedBtn)moreSpeedBtn.onclick=e=>{e.stopPropagation();moreMenuMain?.classList.add("hidden");moreMenuSpeed?.classList.remove("hidden");positionMoreMenu()};
  if(moreSpeedBack)moreSpeedBack.onclick=e=>{e.stopPropagation();moreMenuSpeed?.classList.add("hidden");moreMenuMain?.classList.remove("hidden");positionMoreMenu()};
  moreMenuSpeed?.querySelectorAll("button[data-speed]").forEach(b=>b.onclick=e=>{e.stopPropagation();sets(+b.dataset.speed)});
+ // Reverse play: plays backwards from the current spot (or from the end if the
+ // video is at the very start). Tapping it again, or play/pause, stops it.
+ const moreReverseBtn=$("#moreReverseBtn"),moreReverseValue=$("#moreReverseValue");
+ const syncReverseUi=()=>{if(moreReverseValue)moreReverseValue.textContent=window.DVReverse?.isActive(v)?"On":"Off";ui()};
+ if(moreReverseBtn)moreReverseBtn.onclick=e=>{
+   e.stopPropagation();
+   if(!window.DVReverse)return;
+   if(DVReverse.isActive(v)){DVReverse.stop(v)}
+   else{allowAutoplay=true;if(!DVReverse.start(v,syncReverseUi))show("Video is not ready yet")}
+   closeMoreMenu();syncReverseUi();
+ };
  if(moreShortcutsBtn)moreShortcutsBtn.onclick=e=>{e.stopPropagation();closeMoreMenu();toggleShortcuts(true)};
  if(morePipBtn)morePipBtn.onclick=e=>{e.stopPropagation();closeMoreMenu();togglePip()};
 
