@@ -598,12 +598,12 @@ async function main(){
    suppressCenterPopTimer=setTimeout(()=>{suppressCenterPop=false},400);
  };
  const updateCenterVisibility=()=>{
-   const wantVisible=(v.paused||v.ended)&&!window.DVReverse?.isActive(v)&&!controls.classList.contains("auto-hidden");
+   const wantVisible=(v.paused||v.ended)&&!window.DVReverse?.isRunning(v)&&!controls.classList.contains("auto-hidden");
    if(wantVisible&&suppressCenterPop){center.classList.add("hidden");return}
    center.classList.toggle("hidden",!wantVisible);
  };
  const ui=()=>{
-   const playing=(!v.paused&&!v.ended)||!!window.DVReverse?.isActive(v);
+   const playing=(!v.paused&&!v.ended)||!!window.DVReverse?.isRunning(v);
    playBtn.innerHTML=playing?PAUSE_SVG_SM:PLAY_SVG_SM;
    playBtn.setAttribute("aria-label",playing?"Pause":"Play");
    showControls();
@@ -619,7 +619,7 @@ async function main(){
    centerFlash.classList.add("pulse");
  };
  const togglePlayWithFlash=()=>{
-   flashCenter((v.paused||v.ended)&&!window.DVReverse?.isActive(v)?PLAY_SVG:PAUSE_SVG);
+   flashCenter(((v.paused||v.ended)&&!window.DVReverse?.isRunning(v))?PLAY_SVG:PAUSE_SVG);
    play();
  };
  // Shared FFmpeg.wasm loader, reused by the .TS conversion flow, the
@@ -707,7 +707,7 @@ async function main(){
  };
  const play=async()=>{
    allowAutoplay=true;
-   if(window.DVReverse?.isActive(v)){DVReverse.stop(v);return}
+   if(window.DVReverse?.isActive(v)){DVReverse.toggle(v);ui();return}
    if(!v.paused){v.pause();return}
    if(isTs && !tsPrepared){
      const ok=await prepareTs();

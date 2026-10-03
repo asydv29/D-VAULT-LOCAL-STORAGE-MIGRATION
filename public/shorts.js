@@ -194,7 +194,7 @@ async function ensureLoaded(i){
 
 function updateCenterIcon(slide,v){
   const icon=slide.querySelector(".short-center-icon");
-  const playing=(!v.paused&&!v.ended)||!!window.DVReverse?.isActive(v);
+  const playing=(!v.paused&&!v.ended)||!!window.DVReverse?.isRunning(v);
   icon.classList.toggle("hidden",playing);
 }
 
@@ -324,7 +324,7 @@ function wireSlide(slide){
     return Math.min(window.innerWidth,window.innerHeight)>=600;
   }
   function togglePlayback(){
-    if(window.DVReverse?.isActive(v)){DVReverse.stop(v);updateCenterIcon(slide,v);return}
+    if(window.DVReverse?.isActive(v)){DVReverse.toggle(v);updateCenterIcon(slide,v);return}
     if(v.paused||v.ended)v.play().catch(()=>{});else v.pause();
   }
 
@@ -412,6 +412,7 @@ function wireSlide(slide){
   const progressBar=slide.querySelector(".short-progress");
   const progressFill=slide.querySelector(".short-progress-fill");
   let wasPlayingBeforeDrag=false;
+  let wasReverseBeforeDrag=false;
   function ratioFromEvent(e){
     const rect=progressBar.getBoundingClientRect();
     return Math.min(1,Math.max(0,(e.clientX-rect.left)/rect.width));
@@ -499,6 +500,7 @@ function wireSlide(slide){
     progressBar.classList.add("dragging");
     showUI();
     wasPlayingBeforeDrag=!v.paused&&!v.ended;
+    wasReverseBeforeDrag=!!window.DVReverse?.isActive(v);
     window.DVReverse?.stop(v,true);
     v.pause();
     seekTo(ratioFromEvent(e));
@@ -516,7 +518,8 @@ function wireSlide(slide){
     progressBar.classList.remove("dragging");
     seekTo(ratioFromEvent(e));
     hidePreview();
-    if(wasPlayingBeforeDrag)v.play().catch(()=>{});
+    if(wasReverseBeforeDrag){wasReverseBeforeDrag=false;window.DVReverse?.start(v,()=>updateCenterIcon(slide,v));updateCenterIcon(slide,v)}
+    else if(wasPlayingBeforeDrag)v.play().catch(()=>{});
     scheduleHide();
   }
   progressBar.addEventListener("pointerup",endDrag);

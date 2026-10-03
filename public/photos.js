@@ -56,6 +56,39 @@ function renderEmpty(){
 // only answers window.fetch() calls (an <img src="/api/..."> request never goes
 // through it and 404s). So thumbs are loaded via fetch -> blob URL, a few at a
 // time, with fallbacks: API thumbnail -> the original image -> placeholder icon.
+// Photo URLs stored in the list (or in the cached list from the last visit) can be dead blob: URLs or
+// /api paths an <img> can't fetch. So every image is resolved by id through fetch() (which the local API
+// serves) into a fresh blob URL, memoised so the grid, viewer and filmstrip share it.
+const blobUrlCache=new Map(); // "kind:id" -> Promise<objectURL>
+async function sniffImageType(b){
+  try{
+    const a=new Uint8Array(await b.slice(0,12).arrayBuffer());
+    if(a[0]===0xFF&&a[1]===0xD8)return 'image/jpeg';
+    if(a[0]===0x89&&a[1]===0x50&&a[2]===0x4E&&a[3]===0x47)return 'image/png';
+    if(a[0]===0x47&&a[1]===0x49&&a[2]===0x46)return 'image/gif';
+    if(a[0]===0x52&&a[1]===0x49&&a[8]===0x57&&a[9]===0x45)return 'image/webp';
+    if(a[4]===0x66&&a[5]===0x74&&a[6]===0x79&&a[7]===0x70)return 'image/heic';
+  }catch(_){}
+  return '';
+}
+function getBlobUrl(id,kind){
+  const k=kind+':'+id;
+  if(blobUrlCache.has(k)){const hit=blobUrlCache.get(k);blobUrlCache.delete(k);blobUrlCache.set(k,hit);return hit}
+  const pr=(async()=>{
+    const r=await fetch('/api/photos/'+encodeURIComponent(id)+'/'+kind);
+    if(!r.ok)throw new Error(kind+' '+r.status);
+    let b=await r.blob();if(!b.size)throw new Error('empty');
+    if(!/^image\//.test(b.type)){const t=await sniffImageType(b);if(t)b=new Blob([b],{type:t})}
+    return URL.createObjectURL(b);
+  })();
+  blobUrlCache.set(k,pr);
+  pr.catch(()=>blobUrlCache.delete(k));
+  if(kind==='stream'){
+    const keys=[...blobUrlCache.keys()].filter(x=>x.startsWith('stream:'));
+    while(keys.length>7){const old=keys.shift(),op=blobUrlCache.get(old);blobUrlCache.delete(old);op&&op.then(u=>URL.revokeObjectURL(u),()=>{})}
+  }
+  return pr;
+}
 const thumbQueue=[];let thumbActive=0;
 function pumpThumbs(){
   while(thumbActive<3&&thumbQueue.length){
@@ -65,7 +98,7 @@ function pumpThumbs(){
 }
 function showPhotoFallback(img){
   img.style.display='none';
-  const tile=img.closest('.photo-tile');
+  const tile=img.closest('.photo-tile,[data-fs-index]');
   if(tile&&!tile.querySelector('.photo-fallback-icon')){
     const span=document.createElement('span');
     span.className='photo-fallback-icon';
@@ -78,14 +111,11 @@ function loadPhotoThumb(img){
   const stage=Number(img.dataset.stage||0);
   img.dataset.stage=String(stage+1);
   const id=img.dataset.photoId;
-  const p=shown[Number(img.closest('.photo-tile')?.dataset.photoIndex)]||{};
+  const p=shown.find(x=>String(x.id)===String(id))||{};
   if(stage===0){
     thumbQueue.push(async()=>{
       try{
-        const r=await fetch('/api/photos/'+encodeURIComponent(id)+'/thumbnail');
-        if(!r.ok)throw new Error('thumb '+r.status);
-        const b=await r.blob();if(!b.size)throw new Error('empty');
-        img.src=URL.createObjectURL(b);
+        img.src=await getBlobUrl(id,'thumbnail');
       }catch{loadPhotoThumb(img)}
     });
     pumpThumbs();
@@ -232,26 +262,19 @@ function preloadNeighbors(){
   const n=shown.length,fast=!conn||conn.effectiveType==='4g';
   (fast?[1,-1,2]:[1]).forEach(d=>{
     const q=shown[(viewerIndex+d+n)%n];
-    if(q&&!q.isVideo&&q.url)loadFullPhoto(q.url);
+    if(q&&!q.isVideo)getBlobUrl(q.id,'stream').catch(()=>{});
   });
 }
 function showPhoto(imgEl,p){
   const token=++photoToken;
-  const full=loadFullPhoto(p.url);
-  const apply=()=>{
-    if(token!==photoToken)return; // navigated away while this was loading
-    imgEl.src=p.url;              // already downloaded, so this is instant
-    preloadNeighbors();
-  };
-  if(full.complete&&full.naturalWidth>0){apply();return}
-  if(p.thumb)imgEl.src=p.thumb; // already in the browser's cache from the grid
-  full.addEventListener('load',apply,{once:true});
-  full.addEventListener('error',()=>{
-    // Keep the preview on screen if there is one; only fall back to
-    // pointing the <img> at the original (the old behaviour) when there
-    // isn't, so a failure still shows the usual broken-image state.
-    if(token===photoToken&&!p.thumb)imgEl.src=p.url;
-  },{once:true});
+  let fullDone=false;
+  // Small preview first (already generated for the grid), then swap in the full-size original.
+  getBlobUrl(p.id,'thumbnail').then(u=>{if(token===photoToken&&!fullDone)imgEl.src=u}).catch(()=>{});
+  getBlobUrl(p.id,'stream').then(u=>{
+    if(token!==photoToken)return;
+    fullDone=true;imgEl.src=u;preloadNeighbors();
+    if(shown[viewerIndex]===p)$('#viewerDownload').href=u;
+  }).catch(()=>{if(token===photoToken&&!fullDone&&p.url)imgEl.src=p.url});
 }
 
 // ---- Full-screen viewer ----
@@ -286,7 +309,8 @@ function updateViewer(){
 }
 function renderFilmstrip(){
   const strip=$('#viewerFilmstrip');
-  strip.innerHTML=shown.map((p,i)=>`<button type="button" class="${i===viewerIndex?'active':''}" data-fs-index="${i}" aria-label="${esc(p.title||'')}"><img loading="lazy" decoding="async" src="${esc(p.thumb)}" alt=""></button>`).join('');
+  strip.innerHTML=shown.map((p,i)=>`<button type="button" class="${i===viewerIndex?'active':''}" data-fs-index="${i}" aria-label="${esc(p.title||'')}"><img decoding="async" data-photo-id="${esc(p.id)}" data-lazy-thumb="1" alt="" onerror="window.handlePhotoThumbFail&&window.handlePhotoThumbFail(this)"></button>`).join('');
+  strip.querySelectorAll('img[data-lazy-thumb]').forEach(loadPhotoThumb);
   strip.querySelectorAll('[data-fs-index]').forEach(b=>b.onclick=()=>{stopSlideshow();viewerIndex=Number(b.dataset.fsIndex);updateViewer()});
   const activeBtn=strip.querySelector('button.active');
   if(activeBtn)activeBtn.scrollIntoView({inline:'center',block:'nearest'});

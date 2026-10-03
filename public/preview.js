@@ -10,7 +10,7 @@
     if(active?.vid===vid)active=null;
     card.classList.remove('previewing','loading');
     const bar=card.querySelector('.thumb-loadbar');if(bar){bar.style.width='0';bar.style.transition='none';bar.classList.remove('from-right')}
-    card.querySelectorAll('.thumb-rev-canvas').forEach(c=>c.remove());
+    card.querySelectorAll('.thumb-rev-canvas,.dv-reverse-canvas').forEach(c=>c.remove());
     vid.pause();vid.removeAttribute('src');vid.load();
   }
   // Progress line = only the part already watched. Driven by the real playhead
@@ -113,7 +113,7 @@
           const src=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):vid.dataset.src;
           if(!src)throw new Error('No local or remote preview source');
           vid.src=src;vid.preload='auto';card.classList.remove('loading');start(vid,card,0);
-        }catch{card.classList.remove('loading')}},180)});
+        }catch{card.classList.remove('loading')}},100)});
         card.addEventListener('mouseleave',()=>{clearTimeout(timer);if(active?.vid===vid)return;card.classList.remove('loading');if(vid.src){vid.removeAttribute('src');vid.load()}});
       }else{
         if(vid.dataset.dpTouch)return;vid.dataset.dpTouch='1';
@@ -158,6 +158,7 @@
           }catch{}};
           if(!reverse)attach(vid.dataset.src,begin);
           else{
+            const legacyReverse=()=>{
             const lid=vid.dataset.localId;
             const seekFallback=async()=>{
               if(window.DVaultMedia&&lid){
@@ -180,6 +181,27 @@
                 attach(u,()=>{if(done||my!==gid)return;done=true;start(vid,card,0,true)});
               },()=>{revFailed.add(revUrl);seekFallback()});
             }else seekFallback();
+            };
+            // Smooth path: decode the clip forward in the background and draw it backwards on a canvas.
+            if(window.DVReverse&&DVReverse.supportsFast){
+              let fired=false;
+              const fastRev=()=>{
+                if(fired||my!==gid)return;fired=true;
+                const bar=card.querySelector('.thumb-loadbar');
+                if(bar){bar.classList.add('from-right');bar.style.transition='none';bar.style.width='0'}
+                const finish=()=>stop(vid,card);
+                active={vid,card,stop:()=>{DVReverse.stop(vid,true);finish()}};
+                card.classList.add('previewing');
+                const ok=DVReverse.startPreview(vid,card,{
+                  rate:PREVIEW_SPEED,maxSeconds:previewWindow(vid.duration),
+                  onProgress:(T,d)=>{if(bar&&d)bar.style.width=((1-T/d)*100).toFixed(2)+'%'},
+                  onEnd:()=>{if(active?.vid===vid)finish()},
+                  onFail:()=>{if(my!==gid)return;card.classList.remove('previewing');active=null;legacyReverse()}
+                });
+                if(!ok){card.classList.remove('previewing');active=null;legacyReverse()}
+              };
+              attach(vid.dataset.src,fastRev);
+            }else legacyReverse();
           }
         };
         card.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;drag=false},{passive:true});
