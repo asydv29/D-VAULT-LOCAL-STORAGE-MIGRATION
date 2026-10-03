@@ -1,0 +1,8 @@
+{
+  "$schema":"node_modules/wrangler/config-schema.json",
+  "name":"d-vault",
+  "main":"src/index.js",
+  "compatibility_date":"2026-08-11",
+  "compatibility_flags":["nodejs_compat"],
+  "assets":{"directory":"./public","binding":"ASSETS","html_handling":"none"}
+}

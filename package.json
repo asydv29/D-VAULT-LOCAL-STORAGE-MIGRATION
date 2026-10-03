@@ -1,0 +1,1 @@
+{"name":"d-vault","private":true,"version":"6.0.0","scripts":{"deploy":"wrangler deploy"},"dependencies":{},"devDependencies":{"wrangler":"^4.0.0"}}
