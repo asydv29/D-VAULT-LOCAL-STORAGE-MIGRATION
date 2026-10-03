@@ -1,0 +1,7 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mark as Shorts">
+  <g fill="#ff2020">
+    <rect x="5" y="10" width="78" height="34" rx="17" transform="rotate(28 44 27)"/>
+    <rect x="17" y="56" width="78" height="34" rx="17" transform="rotate(28 56 73)"/>
+  </g>
+  <path d="M 38 34 L 66 50 L 38 66 Z" fill="#ffffff"/>
+</svg>
