@@ -1,0 +1,2567 @@
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;background:#0f0f0f;color:#f1f1f1;font-family:Arial,Helvetica,sans-serif}button,a{font:inherit}button,a,input,select,textarea,[tabindex]{outline:none}
+/* Site-wide instant tap feedback. Buttons/links already work the moment
+   they're tapped - what was missing was any visual acknowledgment of that
+   until whatever the tap triggers (a menu opening, a page navigating,
+   etc.) actually finished, which is what reads as "lag" on a slower
+   connection or device even though the click itself fired immediately.
+   :active is applied by the browser the instant a press starts (no
+   artificial delay), so dimming on it gives immediate feedback; the
+   transition lives on the resting rule only, so it plays on *release*
+   (fading back up) and never delays the press itself. More specific
+   :active rules elsewhere (player controls, etc.) still win over this. */
+/* Hover/focus colour changes ease in over ~150ms instead of cutting instantly; the
+   `scale` entry is the smooth (slightly springy) release after a press - see the
+   Motion polish block at the end of this file. Anything with its own transition
+   declaration is unaffected. */
+button,a{transition:opacity .12s ease,background-color .15s ease,color .15s ease,border-color .15s ease,scale .2s cubic-bezier(.2,.9,.3,1.3)}
+button:not(:disabled):active,a:active{transition:none;opacity:.7}
+/* Removes the ~300ms double-tap-zoom delay some mobile browsers still
+   apply to double-taps on interactive elements. */
+button,a,[role="button"],.chip,.filter-tab,.side-item,.more-btn,.action-btn,.icon-btn{touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid #3ea6ff;outline-offset:2px}.yt-topbar{height:64px;background:#0f0f0f;display:flex;align-items:center;gap:14px;padding:0 16px;position:sticky;top:0;z-index:50}.icon-btn{border:0;background:transparent;color:#fff;cursor:pointer;font-size:25px;width:42px;height:42px;border-radius:50%}.menu-btn{position:relative;display:flex;align-items:center;justify-content:center}.menu-btn::before,.menu-btn::after,.menu-btn{ } .menu-btn::before{content:"";position:absolute;width:22px;height:2px;background:#fff;border-radius:2px;box-shadow:0 -7px 0 #fff,0 7px 0 #fff} .menu-btn{font-size:0}.icon-btn:hover{background:#272727}.yt-brand{display:flex;align-items:center;color:#fff;text-decoration:none;width:175px;height:52px;overflow:hidden}.brand-logo{width:38px;height:38px;object-fit:cover;border-radius:8px;display:block}.search-form{height:42px;display:flex;flex:1;max-width:690px;margin-left:auto}.search-form input{flex:1;min-width:80px;background:#121212;border:1px solid #303030;border-right:0;color:#fff;padding:0 18px;font-size:16px;border-radius:24px 0 0 24px;outline:none}.search-form input:focus{border-color:#3ea6ff}.search-form button{width:70px;border:1px solid #303030;background:#222;color:#fff;border-radius:0 24px 24px 0;font-size:29px;cursor:pointer}.mic-btn{background:#272727}.top-actions{display:flex;align-items:center;gap:10px;margin-left:auto}.create-btn{border:0;background:#272727;color:#fff;border-radius:22px;padding:10px 16px;cursor:pointer}.create-btn:hover{background:#3a3a3a}.avatar{border:0;background:#19a889;color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer}.layout{display:flex}.sidebar{width:230px;flex:none;padding:10px 10px 30px;position:sticky;top:64px;height:calc(100vh - 64px);overflow:auto;transition:width .2s ease,transform .2s ease}.side-item{display:flex;align-items:center;gap:22px;width:100%;height:48px;padding:0 15px;background:transparent;border:0;color:#fff;text-decoration:none;border-radius:10px;cursor:pointer;text-align:left;font-size:14px}.side-item:first-letter{font-size:23px}.side-item:hover,.side-item.active{background:#272727}.side-item span{font-size:14px}.side-divider{height:1px;background:#303030;margin:12px 0;flex-shrink:0}.side-title{font-weight:700;padding:8px 15px}.side-small{color:#aaa;font-size:12px;line-height:1.45;padding:12px 15px}.side-signout{display:block;color:#aaa;text-decoration:none;font-size:13px;padding:12px 15px}.content{min-width:0;flex:1;padding:0 28px 40px}.chips{display:flex;gap:12px;overflow:auto;padding:10px 0 20px;position:sticky;top:64px;background:#0f0f0f;z-index:20;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}.chip{white-space:nowrap;border:0;background:#272727;color:#fff;padding:10px 17px;border-radius:9px;font-weight:600;cursor:pointer}.chip:hover{background:#3a3a3a}.chip.active{background:#fff;color:#111}.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.section-head h1{font-size:20px;margin:0}.section-head select{background:#272727;color:#fff;border:1px solid #444;border-radius:8px;padding:8px 10px}.video-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:30px 18px}.video-card{min-width:0;position:relative;z-index:0}
+.video-card:has(.card-menu.open){z-index:15}.thumb{display:block;position:relative;touch-action:pan-y;aspect-ratio:16/9;border-radius:11px;overflow:hidden;background:#272727}.thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s,opacity .15s ease}.thumb.thumb-pending{background:linear-gradient(90deg,#242424 25%,#3a3a3a 37%,#242424 63%);background-size:400% 100%;animation:mtShimmer 1.4s ease infinite}.thumb.thumb-pending img{opacity:0}.thumb:hover img{transform:scale(1.025)}.thumb-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;pointer-events:none;background:#000;transition:opacity .15s ease}.thumb.previewing img{opacity:0}.thumb.previewing .thumb-preview{opacity:1}.duration{position:absolute;right:7px;bottom:7px;background:#111;color:#fff;font-size:12px;font-weight:700;padding:3px 5px;border-radius:3px;z-index:1}.short-badge{position:absolute;left:7px;bottom:7px;background:#f00;color:#fff;font-size:11px;font-weight:700;padding:3px 6px;border-radius:3px;z-index:1;letter-spacing:.2px}.thumb-play{display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:35px;background:#0005}.thumb.previewing .thumb-play{display:none}.thumb.loading .thumb-play{display:none}.thumb-loadbar{display:none;position:absolute;top:0;left:0;height:3px;width:0;background:rgba(255,255,255,.7);z-index:2}.thumb-loadbar.from-right{left:auto;right:0}.thumb.loading .thumb-loadbar{display:block;animation:mtLoadBar var(--load-dur,.5s) linear forwards}.thumb.previewing .thumb-loadbar{display:block}@keyframes mtLoadBar{from{width:0}to{width:100%}}.card-row{display:grid;grid-template-columns:36px 1fr 28px;gap:10px;margin-top:10px}.channel-avatar{width:36px;height:36px;border-radius:50%;background:#444;display:flex;align-items:center;justify-content:center;font-weight:700}.video-title{display:block;color:#f1f1f1;text-decoration:none;font-size:16px;font-weight:700;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.channel,.stats{margin:5px 0 0;color:#aaa;font-size:13px}.more-btn{border:0;background:transparent;color:#fff;font-size:22px;cursor:pointer;height:34px}.card-menu{display:none;position:absolute;right:5px;top:calc(100% - 28px);z-index:10;background:#282828;border-radius:10px;padding:6px;box-shadow:0 6px 25px #000;min-width:130px}.card-menu.open{display:block}.card-menu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:#fff;padding:10px;border-radius:7px;cursor:pointer}.card-menu button:hover{background:#3a3a3a}.card-menu button.is-liked{color:#3ea6ff;font-weight:700}.card-menu button:disabled{cursor:default}.card-menu button.is-saved{color:#3ea6ff;opacity:.85}.card-menu button.is-saved:hover{background:transparent}.card-menu button.delete-btn{color:#ff6b6b}.card-menu button.delete-btn:hover{background:#3a2020}.empty-state{grid-column:1/-1;text-align:center;padding:90px 20px;color:#aaa}.empty-icon{font-size:45px}.empty-state h2{color:#fff}.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);opacity:0;background:#fff;color:#111;padding:12px 18px;border-radius:8px;z-index:100;transition:.2s}.toast.show{opacity:1;transform:translate(-50%,0)}.modal{display:none;position:fixed;inset:0;background:#0009;z-index:90;align-items:center;justify-content:center}.modal.show{display:flex}.modal-card{position:relative;width:min(440px,90vw);background:#282828;border-radius:14px;padding:28px;box-shadow:0 20px 70px #000}.modal-card h2{margin-top:0}.modal-card p{color:#ccc;line-height:1.5}.modal-close{position:absolute;right:10px;top:8px;background:transparent;color:#fff;border:0;font-size:28px;cursor:pointer}.sidebar.collapsed{width:86px}.sidebar.collapsed .side-item{flex-direction:column;height:70px;gap:4px;justify-content:center;padding:4px}.sidebar.collapsed .side-item span,.sidebar.collapsed .side-title,.sidebar.collapsed .side-small,.sidebar.collapsed .side-signout{display:none}.sidebar.collapsed .side-divider{margin:6px}.sidebar.collapsed{padding-left:5px;padding-right:5px}@media(max-width:1200px){.video-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.yt-brand{min-width:auto}.mic-btn{display:none}body:not(.home-page) .sidebar{width:86px}body:not(.home-page) .sidebar .side-item{flex-direction:column;height:70px;gap:4px;justify-content:center;padding:4px}body:not(.home-page) .sidebar .side-item span,body:not(.home-page) .sidebar .side-title,body:not(.home-page) .sidebar .side-small,body:not(.home-page) .sidebar .side-signout{display:none}body:not(.home-page) .sidebar .side-divider{margin:6px}.content{padding-left:18px;padding-right:18px}}@media(max-width:700px){.video-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:25px 12px}.yt-topbar{gap:5px;padding:0 8px}.yt-brand strong{font-size:17px}.yt-brand{min-width:auto}.search-form{max-width:none}.search-form button{width:48px}.top-actions .create-btn,.top-actions .icon-btn{display:none}.content{padding:0 10px 30px}.chips{top:64px;padding-bottom:12px}.video-grid{grid-template-columns:1fr;gap:25px}.sidebar{display:none}.section-head{margin-top:4px}.thumb{border-radius:9px}.video-title{font-size:15px}}
+
+@media(max-width:430px){.video-grid{grid-template-columns:1fr;gap:25px}}\n\n/* =========================
+   MyTube Watch Page
+   Responsive: desktop / tablet / phone
+   ========================= */
+.watch-page{
+  min-height:100vh;
+  background:#0f0f0f;
+  color:#f1f1f1;
+  overscroll-behavior-y:auto;
+}
+.watch-page .topbar{
+  height:64px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:0 18px;
+  background:#0f0f0f;
+  border-bottom:1px solid #202020;
+  position:sticky;
+  top:0;
+  z-index:50;
+}
+.watch-page .brand{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:145px;
+  color:#fff;
+  text-decoration:none;
+  font-size:21px;
+  font-weight:700;
+  text-transform:none;
+  flex:none;
+}
+.watch-page .brand-play-icon{flex:none;fill:#fff}
+.watch-page .top-actions{margin-left:auto;display:flex;align-items:center}
+.watch-page .home-link{
+  color:#fff;
+  text-decoration:none;
+  background:#272727;
+  padding:9px 15px;
+  border-radius:20px;
+}
+/* Search icon + inline expanding search box, YouTube-mobile style: the
+   box opens in place on the watch page itself (no navigation) and only
+   submitting a query sends you to the home page's results. */
+.watch-page .watch-search-form{
+  display:none;
+  flex:1;
+  align-items:center;
+  min-width:0;
+  margin-left:4px;
+  height:40px;
+  border:1px solid #303030;
+  border-radius:20px;
+  background:#121212;
+  overflow:hidden;
+}
+.watch-page .watch-search-form.show{display:flex}
+.watch-page .watch-search-form:focus-within{border-color:#3ea6ff}
+.watch-page .watch-search-back,
+.watch-page .watch-search-submit{
+  flex:none;
+  width:40px;
+  height:38px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+.watch-page .watch-search-input{
+  flex:1;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#fff;
+  font-size:15px;
+  padding:0 2px;
+}
+.watch-page .watch-search-input::placeholder{color:#aaa}
+.watch-page.search-mode .brand,
+.watch-page.search-mode .top-actions{display:none}
+.watch-page .watch-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 380px;
+  align-items:start;
+  gap:20px;
+  max-width:1800px;
+  margin:18px auto 40px;
+  padding:0 20px;
+}
+.watch-page .watch-main{min-width:0}
+.watch-page .player{
+  position:relative;
+  width:100%;
+  aspect-ratio:16/9;
+  min-height:0;
+  background:#000;
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:0 0 0 1px #242424;
+}
+.watch-page .player:fullscreen{
+  width:100vw;
+  height:100vh;
+  aspect-ratio:auto;
+  border-radius:0;
+  box-shadow:none;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+}
+.watch-page .player:-webkit-full-screen{
+  width:100vw;
+  height:100vh;
+  aspect-ratio:auto;
+  border-radius:0;
+  box-shadow:none;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+}
+.watch-page #video{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:contain;
+  background:#000;
+  will-change:transform;
+  transform:translateZ(0);
+}
+.watch-page .touch-zone{
+  position:absolute;
+  top:0;
+  bottom:70px;
+  width:32%;
+  z-index:2;
+}
+.watch-page .touch-left{left:0}
+.watch-page .touch-right{right:0}
+.watch-page .center-play{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%) scale(.82);
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  background:rgba(20,20,20,.55);
+  display:grid;
+  place-items:center;
+  font-size:28px;
+  z-index:4;
+  cursor:pointer;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .1s ease-out, transform .12s cubic-bezier(.2,.9,.3,1.3);
+}
+.watch-page .center-play:not(.hidden){
+  opacity:1;
+  transform:translate(-50%,-50%) scale(1);
+  pointer-events:auto;
+}
+.watch-page .center-flash{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:60px;
+  height:60px;
+  margin:-30px 0 0 -30px;
+  border-radius:50%;
+  background:rgba(20,20,20,.55);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:30px;
+  z-index:6;
+  opacity:0;
+  pointer-events:none;
+}
+.watch-page .center-flash.pulse{
+  animation:mtCenterFlash .35s cubic-bezier(.2,.8,.3,1);
+}
+@keyframes mtCenterFlash{
+  0%{opacity:0;transform:scale(.7)}
+  12%{opacity:1;transform:scale(1.12)}
+  25%{opacity:1;transform:scale(1)}
+  65%{opacity:.9;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.1)}
+}
+.watch-page .gesture-hint{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  background:#000c;
+  padding:10px 16px;
+  border-radius:10px;
+  opacity:0;
+  pointer-events:none;
+  z-index:10;
+  transition:opacity .15s;
+}
+.watch-page .gesture-hint.show{opacity:1}
+.watch-page .speed-badge{
+  position:absolute;
+  left:50%;
+  top:28px;
+  transform:translate(-50%,-8px);
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background:#000c;
+  color:#fff;
+  padding:8px 16px;
+  border-radius:20px;
+  font-size:14px;
+  font-weight:700;
+  opacity:0;
+  pointer-events:none;
+  z-index:11;
+  transition:opacity .15s ease, transform .15s ease;
+}
+.watch-page .speed-badge.show{opacity:1;transform:translate(-50%,0)}
+.watch-page .speed-badge-icon{font-size:12px;letter-spacing:-1px}
+.watch-page .skip-indicator{
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:38%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  opacity:0;
+  pointer-events:none;
+  z-index:5;
+}
+.watch-page .skip-indicator-left{
+  left:0;
+  background:radial-gradient(circle at 15% 50%,#0008 0%,#0000 70%);
+}
+.watch-page .skip-indicator-right{
+  right:0;
+  background:radial-gradient(circle at 85% 50%,#0008 0%,#0000 70%);
+}
+.watch-page .skip-indicator-icon{font-size:26px;color:#fff;letter-spacing:1px}
+.watch-page .skip-indicator-text{color:#fff;font-size:13px;font-weight:600}
+.watch-page .skip-indicator.pulse{animation:mtSkipFlash .65s ease-out}
+.watch-page .screenshot-btn{
+  position:absolute;
+  right:16px;
+  top:50%;
+  transform:translateY(-50%);
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  border:none;
+  background:transparent;
+  color:#fff;
+  filter:drop-shadow(0 1px 3px #000a) drop-shadow(0 0 2px #0008);
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  z-index:8;
+  opacity:1;
+  pointer-events:auto;
+  transition:opacity .2s ease, transform .1s ease;
+}
+.watch-page .screenshot-btn:active{transform:translateY(-50%) scale(.88)}
+.watch-page .screenshot-btn img{filter:brightness(0) invert(1)}
+.watch-page .screenshot-btn.flash{animation:mtScreenshotFlash .4s ease-out}
+@keyframes mtScreenshotFlash{
+  0%{filter:drop-shadow(0 0 0 #ffffffcc) drop-shadow(0 0 0 #ffffffcc)}
+  100%{filter:drop-shadow(0 0 10px #ffffff00) drop-shadow(0 0 10px #ffffff00)}
+}
+@media (max-width:680px){
+  .watch-page .screenshot-btn{width:26px;height:26px}
+  .watch-page .screenshot-btn img{width:16px;height:16px}
+}
+@keyframes mtSkipFlash{
+  0%{opacity:0}
+  18%{opacity:1}
+  70%{opacity:1}
+  100%{opacity:0}
+}
+.watch-page .more-menu-item[hidden]{display:none}
+.watch-page .shortcuts-panel{
+  position:absolute;
+  inset:0;
+  z-index:40;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#000a;
+  animation:mtFadeIn .15s ease;
+}
+.watch-page .shortcuts-panel[hidden]{display:none}
+.watch-page .shortcuts-card{
+  position:relative;
+  width:min(360px,88%);
+  max-height:80%;
+  overflow:auto;
+  background:#181818;
+  border:1px solid #3b3b3b;
+  border-radius:12px;
+  padding:20px;
+  box-shadow:0 20px 60px #000c;
+  animation:mtPopIn .18s cubic-bezier(.2,.8,.3,1);
+}
+.watch-page .shortcuts-card h2{
+  margin:0 0 12px;
+  font-size:16px;
+  color:#fff;
+}
+.watch-page .shortcuts-card ul{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+}
+.watch-page .shortcuts-card li{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  font-size:13px;
+  color:#ddd;
+}
+.watch-page .shortcuts-card .key{
+  flex:0 0 auto;
+  background:#2c2c2c;
+  border:1px solid #444;
+  border-radius:6px;
+  padding:3px 8px;
+  font-size:12px;
+  color:#fff;
+  white-space:nowrap;
+}
+.watch-page .shortcuts-close{
+  position:absolute;
+  top:10px;
+  right:10px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  width:30px;
+  height:30px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:15px;
+}
+.watch-page .shortcuts-close:hover{background:#ffffff1c}
+@keyframes mtFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes mtPopIn{from{opacity:0;transform:scale(.94) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.watch-page .controls{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:5;
+  padding:7px 12px 10px;
+  background:linear-gradient(transparent,#000d 35%);
+}
+.watch-page .seek-area{
+  position:relative;
+  padding:9px 0 8px;
+  touch-action:none;
+  cursor:pointer;
+}
+.watch-page .timeline{
+  position:relative;
+  height:5px;
+  background:#ffffff40;
+  border-radius:4px;
+  cursor:pointer;
+  transition:height .15s ease;
+}
+.watch-page .timeline:focus-visible{
+  outline:2px solid #ff174f;
+  outline-offset:4px;
+  border-radius:4px;
+}
+.watch-page .seek-area:hover .timeline,
+.watch-page .timeline.dragging{
+  height:7px;
+}
+.watch-page .buffered,
+.watch-page .played{
+  position:absolute;
+  left:0;
+  top:0;
+  height:100%;
+  border-radius:4px;
+}
+.watch-page .buffered{
+  background:#ffffff70;
+  transition:width .3s ease;
+}
+.watch-page .played{
+  background:#ff174f;
+  transition:width .12s linear;
+  will-change:width;
+}
+.watch-page .timeline.dragging .played,
+.watch-page .timeline.dragging .buffered{
+  transition:none;
+}
+.watch-page .scrubber{
+  position:absolute;
+  top:50%;
+  width:13px;
+  height:13px;
+  margin-left:-6px;
+  transform:translateY(-50%) scale(.55);
+  border-radius:50%;
+  background:#ff174f;
+  opacity:0;
+  box-shadow:0 0 0 0 rgba(255,23,79,.35);
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1),opacity .15s ease,box-shadow .2s ease,left .1s linear;
+}
+.watch-page .seek-area:hover .scrubber{
+  transform:translateY(-50%) scale(1);
+  opacity:1;
+}
+.watch-page .timeline.dragging .scrubber{
+  transform:translateY(-50%) scale(1.3);
+  opacity:1;
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .2s ease;
+  box-shadow:0 0 0 8px rgba(255,23,79,.25);
+  animation:mtScrubberPulse 1.1s ease-out infinite;
+}
+@keyframes mtScrubberPulse{
+  0%{box-shadow:0 0 0 0 rgba(255,23,79,.35)}
+  70%{box-shadow:0 0 0 10px rgba(255,23,79,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,23,79,0)}
+}
+@media (prefers-reduced-motion:reduce){
+  .watch-page .timeline,
+  .watch-page .scrubber,
+  .watch-page .played,
+  .watch-page .buffered,
+  .watch-page .preview,
+  .watch-page .shortcuts-panel,
+  .watch-page .shortcuts-card,
+  .watch-page .skip-indicator{transition:none!important;animation:none!important}
+}
+.watch-page .control-row{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-height:40px;
+}
+.watch-page .control-btn{
+  border:0;
+  background:transparent;
+  color:#fff;
+  min-width:38px;
+  height:38px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:17px;
+  transition:background .12s ease-out, transform .12s cubic-bezier(.4,0,.2,1);
+}
+.watch-page .control-btn:hover{background:#ffffff1c}
+.watch-page .control-btn:active{transform:scale(.9);background:#ffffff2a}
+.watch-page #playBtn{display:flex;align-items:center;justify-content:center}
+.watch-page .volume-btn{display:flex;align-items:center;justify-content:center}
+.watch-page .volume-icon{
+  display:inline-block;
+  width:20px;
+  height:20px;
+  background-color:#fff;
+  -webkit-mask:url(/icons/volume.png) center/contain no-repeat;
+  mask:url(/icons/volume.png) center/contain no-repeat;
+  transition:opacity .15s ease;
+}
+.watch-page .volume-btn.is-muted .volume-icon{
+  -webkit-mask-image:url(/icons/mute.png);
+  mask-image:url(/icons/mute.png);
+}
+.watch-page .volume-area{
+  display:flex;
+  align-items:center;
+  width:60px;
+  height:34px;
+  cursor:pointer;
+  touch-action:none;
+}
+.watch-page .volume-track{
+  position:relative;
+  width:100%;
+  height:3px;
+  border-radius:3px;
+  background:#ffffff40;
+  transition:height .15s ease;
+}
+.watch-page .volume-area:hover .volume-track,
+.watch-page .volume-track.dragging{height:4px}
+.watch-page .volume-fill{
+  position:absolute;
+  left:0;
+  top:0;
+  height:100%;
+  width:0;
+  border-radius:4px;
+  background:#fff;
+  pointer-events:none;
+}
+.watch-page .volume-thumb{
+  position:absolute;
+  top:50%;
+  left:0;
+  width:10px;
+  height:10px;
+  margin-left:-5px;
+  transform:translateY(-50%);
+  border-radius:50%;
+  background:#fff;
+  pointer-events:none;
+  transition:transform .15s cubic-bezier(.34,1.56,.64,1);
+}
+.watch-page .volume-area:hover .volume-thumb,
+.watch-page .volume-track.dragging .volume-thumb{transform:translateY(-50%) scale(1.3)}
+.watch-page .volume-track:focus-visible{
+  outline:2px solid #fff;
+  outline-offset:4px;
+  border-radius:4px;
+}
+.watch-page .time{
+  color:#fff;
+  font-size:13px;
+  white-space:nowrap;
+}
+.watch-page .control-spacer{flex:1}
+.watch-page .speed-menu{
+  display:none;
+  position:absolute;
+  right:10px;
+  bottom:55px;
+  z-index:20;
+  min-width:145px;
+  background:#252525;
+  border:1px solid #3b3b3b;
+  border-radius:10px;
+  padding:5px;
+  box-shadow:0 12px 40px #000;
+}
+.watch-page .speed-menu.show{display:block}
+.watch-page .speed-menu button{
+  display:block;
+  width:100%;
+  text-align:left;
+  padding:9px 11px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  border-radius:7px;
+  cursor:pointer;
+}
+.watch-page .speed-menu button:hover{background:#3a3a3a}
+.watch-page .more-menu{
+  display:none;
+  position:fixed;
+  z-index:250;
+  min-width:200px;
+  background:#252525;
+  border:1px solid #3b3b3b;
+  border-radius:10px;
+  padding:5px;
+  box-shadow:0 12px 40px #000;
+}
+.watch-page .more-menu.show{display:block}
+.watch-page .more-menu-panel.hidden{display:none}
+.watch-page .more-menu-item,
+.watch-page .more-menu-speed button{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  width:100%;
+  text-align:left;
+  padding:9px 11px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  border-radius:7px;
+  cursor:pointer;
+  font-size:14px;
+}
+.watch-page .more-menu-item:hover,
+.watch-page .more-menu-speed button:hover{background:#3a3a3a}
+.watch-page .more-menu-value{color:#aaa;font-size:13px}
+.watch-page .more-menu-icon{font-size:15px;color:#ccc}
+.watch-page .more-menu-icon.shorts-menu-icon{width:17px;height:17px;object-fit:contain}
+.watch-page .more-menu-icon-svg{display:inline-flex;align-items:center;justify-content:center}
+.watch-page .more-menu-icon-svg svg{width:17px;height:17px}
+.watch-page .more-menu-back{
+  font-weight:700;
+  border-bottom:1px solid #3b3b3b;
+  border-radius:7px 7px 0 0;
+  margin-bottom:3px;
+}
+.watch-page .more-menu-speed button[data-speed]{justify-content:flex-start}
+.watch-page .preview{
+  position:absolute;
+  bottom:43px;
+  transform:translateX(-50%) translateY(6px) scale(.94);
+  width:192px;
+  background:#111;
+  border:2px solid #ddd;
+  border-radius:8px;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:30;
+  opacity:0;
+  visibility:hidden;
+  transition:opacity .12s ease,transform .15s cubic-bezier(.2,.8,.3,1),visibility .12s;
+}
+.watch-page .preview.show{
+  opacity:1;
+  visibility:visible;
+  transform:translateX(-50%) translateY(0) scale(1);
+}
+.watch-page .preview canvas{
+  width:192px;
+  height:108px;
+  display:block;
+}
+.watch-page #previewTime{
+  text-align:center;
+  padding:4px;
+  font-size:12px;
+}
+.watch-page #title{
+  margin:16px 0 8px;
+  font-size:21px;
+  line-height:1.35;
+}
+.watch-page #title .title-more{
+  display:inline;
+  border:0;
+  background:transparent;
+  padding:0;
+  margin:0;
+  color:#aaa;
+  font:inherit;
+  font-weight:600;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.watch-page #title .title-more:hover{color:#fff}
+.watch-page .video-meta{
+  color:#aaa;
+  font-size:13px;
+  margin-bottom:12px;
+}
+.watch-page .video-meta #metaText{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.watch-page .meta-quality-badge{
+  background:#3a3a3a;
+  color:#fff;
+  font-size:11px;
+  font-weight:600;
+  padding:2px 6px;
+  border-radius:4px;
+  letter-spacing:.3px;
+}
+.watch-page .meta-dot{
+  color:#777;
+}
+.watch-page .actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.watch-page .action-btn{
+  border:0;
+  background:#272727;
+  color:#fff;
+  border-radius:22px;
+  padding:10px 15px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.watch-page .action-btn:hover{background:#3a3a3a}
+.watch-page .action-btn .action-icon{width:15px;height:15px;vertical-align:-2px;object-fit:contain;filter:invert(1)}
+.watch-page .action-btn .action-icon.icon-plain{filter:none}
+.watch-page .like-icon-wrap{display:inline-flex;vertical-align:-4px;margin-right:5px}
+.watch-page .like-svg{width:17px;height:17px}
+.watch-page #like.is-liked .like-svg{fill:#ff0000;stroke:#ff0000}
+.watch-page .fav-icon-wrap{display:inline-flex;vertical-align:-4px;margin-right:5px}
+.watch-page .fav-svg{width:17px;height:17px}
+.watch-page #fav.is-saved .fav-svg,
+.watch-page #favStar.is-saved .fav-svg{fill:#3ea6ff;stroke:#3ea6ff}
+.menu-icon{width:16px;height:16px;object-fit:contain;vertical-align:-3px;margin-right:7px}
+.watch-page .recommendations{
+  min-width:0;
+  position:sticky;
+  top:82px;
+  align-self:start;
+}
+.watch-page .rec-divider{
+  height:1px;
+  background:#232323;
+  margin:0 0 16px;
+}
+.watch-page .up-next-list{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:16px;
+  height:auto!important;
+}
+.watch-page .up-next-card{
+  display:block;
+  flex:none;
+  color:#fff;
+  text-decoration:none;
+  position:relative;
+}
+.watch-page .up-next-card:hover .rec-play{opacity:1}
+.watch-page .up-next-card .rec-thumb{touch-action:pan-y;
+  aspect-ratio:16/9;
+  flex:none;
+}
+.watch-page .up-next-card:has(.card-menu.open){z-index:5}
+.watch-page .up-next-info-row{display:flex;align-items:flex-start;justify-content:space-between;gap:4px;min-width:0;margin-top:8px}
+.watch-page .up-next-info{min-width:0;flex:1;color:#fff;text-decoration:none}
+.watch-page .up-next-info-row .rec-more-btn{flex:none;margin-top:-4px}
+.watch-page .up-next-info strong{
+  display:-webkit-box;
+  -webkit-line-clamp:3;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  font-size:14px;
+  line-height:1.3;
+  font-weight:600;
+}
+.watch-page .up-next-info small{
+  display:block;
+  color:#aaa;
+  margin-top:6px;
+}
+.watch-page .related-section{
+  max-width:1800px;
+  margin:0 auto 40px;
+  padding:0 20px;
+}
+.watch-page .related-section .rec-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:14px;
+}
+.watch-page .related-title{margin:0;font-size:19px;font-weight:700;color:#fff}
+.watch-page .rec-refresh-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:34px;
+  height:34px;
+  border:0;
+  border-radius:50%;
+  background:#272727;
+  color:#fff;
+  cursor:pointer;
+  padding:0;
+  flex:none;
+  transition:background .2s;
+}
+.watch-page .rec-refresh-btn:hover{background:#3a3a3a}
+.watch-page .rec-refresh-btn svg{width:17px;height:17px}
+.watch-page .rec-refresh-btn.spinning svg{animation:mtRecRefresh .6s ease}
+@keyframes mtRecRefresh{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.watch-page .rec-refresh-slot{display:none}
+.watch-page .recommendation-list{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:4px;
+}
+.watch-page .rec-sentinel{height:1px}
+.watch-page .rec-loading-more{
+  text-align:center;
+  color:#aaa;
+  font-size:12px;
+  padding:10px 0;
+}
+.watch-page .rec-card{
+  display:block;
+  color:#fff;
+  min-width:0;
+  position:relative;
+}
+.watch-page .rec-thumb-link{color:inherit;text-decoration:none}
+.watch-page .rec-thumb{touch-action:pan-y;
+  position:relative;
+  aspect-ratio:16/9;
+  border-radius:0;
+  background:linear-gradient(135deg,#222,#555);
+  overflow:hidden;
+}
+.watch-page .rec-thumb-preview{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  opacity:0;
+  pointer-events:none;
+  background:#000;
+  transition:opacity .15s ease;
+}
+.watch-page .rec-thumb.previewing img{opacity:0}
+.watch-page .rec-thumb.previewing .rec-thumb-preview{opacity:1}
+.watch-page .rec-play{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  font-size:24px;
+  background:#0005;
+  opacity:0;
+}
+.watch-page .rec-card:hover .rec-play{opacity:1}
+.watch-page .rec-thumb.previewing .rec-play{opacity:0}
+.watch-page .rec-card:has(.card-menu.open){z-index:5}
+.watch-page .rec-info-row{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;min-width:0;margin-top:10px}
+.watch-page .rec-info{min-width:0;flex:1;color:#fff;text-decoration:none}
+.watch-page .rec-more-btn{flex:none;margin-top:-4px}
+.watch-page .rec-info strong{
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  font-size:15px;
+  line-height:1.35;
+  font-weight:700;
+}
+.watch-page .rec-info small{
+  display:block;
+  color:#aaa;
+  margin-top:6px;
+  font-size:13px;
+}
+/* Second grey line (quality · views · size · uploaded) under "D Vault" */
+.watch-page .up-next-info small.card-stats,
+.watch-page .rec-info small.card-stats{margin-top:2px}
+.watch-page .loading-card,
+.watch-page .empty-recommendations{color:#aaa;padding:20px 4px}
+
+/* ===== Loading animations ===== */
+.skel-text{position:relative;color:transparent!important;background:linear-gradient(90deg,#242424 25%,#3a3a3a 37%,#242424 63%);background-size:400% 100%;border-radius:6px;animation:mtShimmer 1.4s ease infinite;display:inline-block;min-width:220px}
+@keyframes mtShimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+.rec-skel{height:78px;border-radius:10px;background:linear-gradient(90deg,#1c1c1c 25%,#2b2b2b 37%,#1c1c1c 63%);background-size:400% 100%;animation:mtShimmer 1.4s ease infinite}
+.player-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:5;opacity:1;transition:opacity .3s ease;pointer-events:none}
+.player-loading.hidden{opacity:0;visibility:hidden}
+.spinner-ring{width:44px;height:44px;border:3px solid #ffffff33;border-top-color:#fff;border-radius:50%;animation:mtSpin .8s linear infinite}
+@keyframes mtSpin{to{transform:rotate(360deg)}}
+.watch-page .rec-card{animation:mtRecIn .35s ease both}
+.watch-page .rec-card:nth-child(1){animation-delay:.02s}
+.watch-page .rec-card:nth-child(2){animation-delay:.06s}
+.watch-page .rec-card:nth-child(3){animation-delay:.1s}
+.watch-page .rec-card:nth-child(4){animation-delay:.14s}
+.watch-page .rec-card:nth-child(5){animation-delay:.18s}
+.watch-page .rec-card:nth-child(n+6){animation-delay:.2s}
+@keyframes mtRecIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.watch-page .rec-card.rec-current{outline:2px solid #fff3;border-radius:10px}
+
+/* Tablet */
+@media (max-width:1100px), (pointer:coarse) and (hover:none){
+  .watch-page .watch-layout{
+    grid-template-columns:1fr;
+    max-width:1000px;
+  }
+  .watch-page .recommendations{
+    display:block;
+    position:static;
+  }
+  .watch-page .up-next-list{
+    display:grid;
+    grid-template-columns:1fr;
+    height:auto!important;
+    gap:16px;
+  }
+  .watch-page .up-next-card{
+    display:block;
+    flex:none;
+  }
+  .watch-page .up-next-card .rec-thumb{touch-action:pan-y;
+    aspect-ratio:16/9;
+    flex:none;
+  }
+  .watch-page .recommendation-list{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:22px 16px;
+  }
+  .watch-page .rec-refresh-slot{
+    display:flex;
+    justify-content:flex-end;
+    margin:0 0 16px;
+  }
+}
+
+/* Small tablets / large phones */
+@media (max-width:800px), (pointer:coarse) and (hover:none){
+  .watch-page .watch-layout{
+    padding:0 12px;
+    margin-top:10px;
+    gap:16px;
+  }
+  .watch-page .topbar{padding:0 12px}
+  .watch-page .brand{min-width:auto}
+  .watch-page .home-link{padding:8px 12px}
+  .watch-page .watch-search-form{height:38px}
+  .watch-page .related-section{padding:0 12px}
+  .watch-page .recommendation-list{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .watch-page .more-menu{
+    min-width:0;
+    width:min(240px,calc(100% - 16px));
+  }
+  .watch-page .more-menu-item,
+  .watch-page .more-menu-speed button{
+    padding:8px 10px;
+    font-size:13px;
+  }
+}
+
+/* The action-bar "More" popup always opens as a fixed bottom sheet,
+   on every device, instead of an anchored dropdown on wide/mouse
+   screens — simpler, and it can never get clipped or misplaced by a
+   scrolling ancestor the way the old anchored variant could. */
+.watch-page .actions-more-menu{
+  display:none;
+  position:fixed;
+  left:0;
+  right:0;
+  top:auto;
+  bottom:0;
+  z-index:250;
+  min-width:0;
+  width:100%;
+  max-width:none;
+  background:#252525;
+  border:1px solid #3b3b3b;
+  border-radius:14px 14px 0 0;
+  max-height:min(65vh,420px);
+  overflow-y:auto;
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));
+  box-shadow:0 -10px 30px #000a;
+}
+.watch-page .actions-more-menu.show{display:block}
+.watch-page .actions-more-menu::before{
+  content:"";
+  display:block;
+  width:36px;
+  height:4px;
+  margin:2px auto 8px;
+  border-radius:3px;
+  background:#4a4a4a;
+}
+
+/* Phone */
+@media (max-width:600px), (pointer:coarse) and (hover:none){
+  .watch-page .topbar{
+    height:56px;
+    gap:8px;
+    padding:0 9px;
+  }
+  .watch-page .brand{
+    font-size:18px;
+  }
+  .watch-page .home-link{
+    font-size:13px;
+    padding:7px 10px;
+  }
+  .watch-page .watch-search-form{height:34px;margin-left:0}
+  .watch-page .watch-search-input{font-size:14px}
+  .watch-page .watch-layout{
+    display:block;
+    padding:0;
+    margin:0;
+  }
+  .watch-page .player{
+    border-radius:0;
+    width:100%;
+  }
+  .watch-page .controls{
+    padding:4px 7px 7px;
+  }
+  .watch-page .seek-area{padding:5px 0}
+  .watch-page .timeline{height:4px}
+  .watch-page .scrubber{width:11px;height:11px;margin-left:-5px}
+  .watch-page .control-row{
+    gap:1px;
+    min-height:36px;
+  }
+  .watch-page .control-btn{
+    min-width:34px;
+    height:34px;
+    font-size:15px;
+  }
+  .watch-page .volume-area{display:none}
+  .watch-page .time{font-size:12px}
+  /* Same fix as .quality-menu above: a bottom sheet fixed to the
+     viewport instead of an absolutely-positioned box inside the
+     (overflow:hidden, ~200px-tall) player, so the "Playback speed"
+     submenu never gets its top rows clipped off-screen. */
+  .watch-page .more-menu{
+    position:fixed;
+    left:0;
+    right:0;
+    top:auto;
+    bottom:0;
+    z-index:250;
+    min-width:0;
+    width:100%;
+    border-radius:14px 14px 0 0;
+    max-height:min(65vh,420px);
+    overflow-y:auto;
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -10px 30px #000a;
+  }
+  .watch-page .more-menu::before{
+    content:"";
+    display:block;
+    width:36px;
+    height:4px;
+    margin:2px auto 8px;
+    border-radius:3px;
+    background:#4a4a4a;
+  }
+  .watch-page .more-menu-item,
+  .watch-page .more-menu-speed button{
+    padding:11px 12px;
+    font-size:14.5px;
+  }
+  .watch-page .more-menu-value{font-size:13px}
+  .watch-page .more-menu-icon{font-size:15px}
+  .watch-page .more-menu-icon.shorts-menu-icon{width:17px;height:17px}
+  .watch-page .more-menu-icon-svg svg{width:17px;height:17px}
+  .watch-page .preview{
+    width:150px;
+    bottom:39px;
+  }
+  .watch-page .preview canvas{
+    width:150px;
+    height:84px;
+  }
+  .watch-page #title{
+    font-size:17px;
+    padding:0 12px;
+    margin:13px 0 7px;
+  }
+  .watch-page .video-meta{
+    padding:0 12px;
+    margin-bottom:10px;
+  }
+  .watch-page .actions{
+    padding:0 12px 4px;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .watch-page .actions::-webkit-scrollbar{display:none}
+  .watch-page .action-btn{padding:9px 13px;font-size:13px}
+  /* .actions-more-menu is a fixed bottom sheet unconditionally now (see its
+     base rule above, near the top of the file) — no phone-only override
+     needed here. */
+  .watch-page .recommendations{
+    padding:0 12px 25px;
+  }
+  .watch-page .rec-refresh-slot{
+    padding:0 12px;
+    margin-bottom:12px;
+  }
+  .watch-page .up-next-info strong{font-size:13px}
+  .watch-page .up-next-info small{font-size:11px}
+  .watch-page .related-section{padding:0 12px 25px}
+  .watch-page .recommendation-list{
+    grid-template-columns:1fr;
+    gap:20px;
+  }
+}
+
+/* Very small phones */
+@media (max-width:380px){
+  .watch-page .brand{font-size:16px}
+  .watch-page .home-link{font-size:12px;padding:6px 8px}
+  .watch-page .control-btn{min-width:31px}
+  .watch-page .time{font-size:11px}
+  .watch-page .action-btn{padding:8px 11px}
+}
+
+
+/* Homepage touch-friendly tablet/phone refinements */
+@media (max-width:900px){
+  .video-grid{gap:28px 14px}
+  .card-row{gap:8px}
+}
+@media (max-width:600px){
+  .yt-topbar{height:56px}
+  .chips{top:56px}
+  .search-form input{font-size:14px;padding:0 13px}
+  .content{padding-left:9px;padding-right:9px}
+  .thumb{border-radius:8px}
+  .card-row{grid-template-columns:34px 1fr 28px}
+  .channel-avatar{width:34px;height:34px}
+}
+
+
+/* ===== Watch player fixes ===== */
+.watch-page .touch-zone{display:none !important;pointer-events:none !important}
+.watch-page .controls{
+  transition:opacity .12s cubic-bezier(.4,0,.2,1), transform .12s cubic-bezier(.4,0,.2,1);
+}
+.watch-page .controls.auto-hidden{
+  opacity:0;
+  transform:translateY(10px);
+  pointer-events:none;
+}
+.watch-page .quality-menu{
+  display:none;
+  position:absolute;
+  right:95px;
+  bottom:55px;
+  z-index:20;
+  width:min(285px,calc(100% - 20px));
+  max-height:min(480px,calc(100vh - 40px));
+  overflow-y:auto;
+  background:#252525;
+  border:1px solid #3b3b3b;
+  border-radius:10px;
+  padding:5px;
+  box-shadow:0 12px 40px #000;
+}
+.watch-page .quality-menu.show{display:block}
+.watch-page .quality-menu button{
+  display:block;
+  width:100%;
+  text-align:left;
+  padding:9px 11px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  border-radius:7px;
+  cursor:pointer;
+}
+.watch-page .quality-menu button:hover{background:#3a3a3a}
+.watch-page .quality-menu button.active{color:#3ea6ff;font-weight:700}
+.watch-page .quality-menu button.active::after{content:"✓";float:right}
+.watch-page .quality-status{
+  color:#3ea6ff;
+  font-size:12px;
+  line-height:1.35;
+  padding:8px 10px 0;
+}
+.watch-page .quality-status.working{color:#f1c40f}
+.watch-page .quality-note{
+  color:#aaa;
+  font-size:11px;
+  line-height:1.35;
+  padding:8px 10px 9px;
+}
+.watch-page .rec-thumb img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.watch-page .rec-thumb img[style*="display: none"] + .rec-play{opacity:1}
+.watch-page .rec-thumb{touch-action:pan-y;
+  background:#272727;
+}
+.watch-page .gesture-hint{
+  pointer-events:none;
+}
+/* Small tablets / large phones — quality menu (must come after the base
+   .quality-menu rule above so it isn't overridden by source order) */
+@media (max-width:800px), (pointer:coarse) and (hover:none){
+  .watch-page .quality-menu{
+    right:75px;
+    bottom:52px;
+    width:min(250px,calc(100% - 16px));
+    max-height:min(400px,calc(100vh - 32px));
+  }
+  .watch-page .quality-menu button{
+    padding:8px 10px;
+    font-size:14px;
+  }
+  .watch-page .quality-note{font-size:10.5px}
+}
+
+@media(max-width:600px), (pointer:coarse) and (hover:none){
+  .watch-page .control-row{gap:0}
+  /* The video frame is short on phones (16:9 width-locked, ~200px tall)
+     and .player clips overflow, so a menu anchored inside it with
+     bottom-up growth gets its top rows clipped off-screen (see the
+     "480p/360p/240p only" bug report). Fixing it to the viewport as a
+     bottom sheet keeps the full list on-screen regardless of player
+     height, and still works in fullscreen since fixed-position
+     descendants of the fullscreen element size to its own viewport. */
+  .watch-page .quality-menu{
+    position:fixed;
+    left:0;
+    right:0;
+    top:auto;
+    bottom:0;
+    z-index:250;
+    width:100%;
+    border-radius:14px 14px 0 0;
+    max-height:min(60vh,380px);
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -10px 30px #000a;
+  }
+  .watch-page .quality-menu::before{
+    content:"";
+    display:block;
+    width:36px;
+    height:4px;
+    margin:2px auto 8px;
+    border-radius:3px;
+    background:#4a4a4a;
+  }
+  .watch-page .quality-menu button{
+    padding:11px 12px;
+    font-size:15px;
+  }
+  .watch-page .quality-status{font-size:11px;padding:6px 9px 0}
+  .watch-page .quality-note{font-size:11px;padding:8px 10px 9px}
+  .watch-page .control-btn{min-width:32px}
+  .watch-page .time{margin-left:2px}
+}
+
+
+/* Definitive player auto-hide behavior */
+/* Intentionally no `transform` here (only .auto-hidden below sets one):
+   a `transform` on .controls — even an identity translateY(0) — makes it
+   the containing block for its position:fixed/absolute descendants
+   (.quality-menu, .more-menu), which defeats the mobile bottom-sheet
+   fix that relies on position:fixed escaping the .player overflow:hidden
+   clip. Transitioning transform from its unset default to translateY(100%)
+   still animates fine, so dropping this doesn't affect the hide animation. */
+.watch-page .controls{
+  opacity:1;
+  visibility:visible;
+  transition:opacity .12s cubic-bezier(.4,0,.2,1), transform .12s cubic-bezier(.4,0,.2,1), visibility 0s linear 0s;
+}
+.watch-page .controls.auto-hidden{
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(100%);
+  pointer-events:none;
+  transition:opacity .12s cubic-bezier(.4,0,.2,1), transform .12s cubic-bezier(.4,0,.2,1), visibility 0s linear .12s;
+}
+.watch-page .player{
+  -webkit-tap-highlight-color:transparent;
+  touch-action:pan-y;
+  /* Allow the browser to handle vertical page scrolling over the player. */
+}
+.watch-page #video{
+  touch-action:pan-y;
+}
+.watch-page .center-play{
+  pointer-events:auto;
+}
+.watch-page .recommendation-list .rec-thumb img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+}
+@media (max-width:600px), (pointer:coarse) and (hover:none){
+  .watch-page .controls.auto-hidden{
+    transform:translateY(110%);
+  }
+}
+
+/* Two-finger page scrolling over the Watch video (Android/WebView). */
+@media (max-width:900px), (pointer:coarse) and (hover:none){
+  .watch-page .watch-layout,.watch-page .watch-main{overflow:visible;}
+  .watch-page{overscroll-behavior-y:auto;}
+}
+
+/* Android/mobile: keep touch ownership on the custom player so two-finger
+   page scrolling is not swallowed by the native HTML5 video surface.
+   Gated on touch capability alone (not also viewport width) so this still
+   applies when a phone's browser is switched to "Desktop site" mode,
+   which reports a wide viewport but is still a touchscreen. */
+@media (pointer:coarse){
+  .watch-page #video{pointer-events:auto;}
+  .watch-page .player{touch-action:pan-y;}
+}
+
+/* Final mobile-player gesture fixes */
+.watch-page .player,
+.watch-page .player *{
+  -webkit-user-select:none;
+  user-select:none;
+}
+.watch-page #video{
+  object-position:center center;
+  transition:object-fit .15s ease, transform .18s ease;
+  transform-origin:center center;
+}
+.watch-page #video.zoom-live{
+  transition:none;
+}
+.watch-page #fitBtn{
+  min-width:42px;
+  font-size:12px;
+  font-weight:700;
+}
+.watch-page .gesture-hint{
+  font-weight:700;
+  min-width:54px;
+  text-align:center;
+}
+@media(max-width:600px), (pointer:coarse) and (hover:none){
+  .watch-page #fitBtn{min-width:38px;font-size:11px}
+}
+
+/* Standalone MPEG-TS preparation status */
+.watch-page .ts-status{
+  position:absolute;
+  left:50%;
+  bottom:78px;
+  transform:translateX(-50%);
+  max-width:90%;
+  padding:9px 13px;
+  border-radius:9px;
+  background:#111e;
+  border:1px solid #444;
+  color:#fff;
+  font-size:13px;
+  line-height:1.35;
+  text-align:center;
+  z-index:15;
+  pointer-events:none;
+}
+.watch-page .ts-status.working{background:#111f;border-color:#666}
+@media(max-width:600px), (pointer:coarse) and (hover:none){
+  .watch-page .ts-status{bottom:65px;font-size:11px;max-width:94%}
+}
+
+/* ===== Full-width responsive homepage fix ===== */
+html, body { width:100%; min-width:0; overflow-x:hidden; }
+.home-page .layout { width:100%; max-width:none; }
+.home-page .content { width:100%; max-width:none; min-width:0; flex:1 1 auto; }
+.home-page .video-grid { width:100%; max-width:none; }
+
+/* Use the available tablet width instead of leaving a blank right column. */
+@media (min-width:701px) and (max-width:1100px){
+  .home-page .video-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:24px 14px;
+  }
+  .home-page .content{
+    padding-left:14px;
+    padding-right:14px;
+  }
+}
+
+/* On phones, use two equal cards so the content fills the screen. */
+@media (max-width:700px){
+  .home-page .content{
+    width:100%;
+    padding-left:8px;
+    padding-right:8px;
+  }
+  .home-page .video-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:22px 10px;
+  }
+  .home-page .card-row{
+    grid-template-columns:28px minmax(0,1fr) 20px;
+    gap:6px;
+  }
+  .home-page .channel-avatar{
+    width:28px;
+    height:28px;
+    font-size:11px;
+  }
+  .home-page .video-title{
+    font-size:12px;
+    line-height:1.3;
+  }
+  .home-page .channel,
+  .home-page .stats{
+    font-size:10px;
+    margin-top:3px;
+  }
+  .home-page .more-btn{
+    font-size:17px;
+    height:28px;
+  }
+}
+
+
+/* =========================================================
+   HOME PAGE — Drive video grid
+   Folders are intentionally never rendered as video cards.
+   ========================================================= */
+.home-page{
+  min-height:100vh;
+  background:#0f0f0f;
+  color:#f1f1f1;
+}
+.home-topbar{
+  min-height:74px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 24px;
+  background:#0f0f0f;
+  border-bottom:1px solid #191919;
+  position:sticky;
+  top:0;
+  z-index:60;
+}
+.home-brand{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+.home-brand .brand-logo{
+  width:40px;
+  height:40px;
+  border-radius:10px;
+  object-fit:cover;
+}
+/* Search starts life collapsed into a plain icon button (matching the
+   compact title-bar look on every page) and only expands into a real
+   input once the person taps/clicks the search icon. */
+.home-search{
+  display:none;
+  height:44px;
+  flex:1 1 auto;
+  max-width:560px;
+  margin:0 4px;
+  border:2px solid #292929;
+  border-radius:24px;
+  overflow:hidden;
+  background:#111;
+}
+.home-search.open{display:flex}
+.home-search:focus-within{border-color:#3ea6ff}
+.home-search input{
+  flex:1;
+  min-width:60px;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#fff;
+  padding:0 20px;
+  font-size:16px;
+}
+.home-search input::placeholder{color:#aaa}
+.topbar-icons{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-left:auto;
+  flex:0 0 auto;
+}
+.topbar-search-btn{display:flex;align-items:center;justify-content:center}
+.topbar-search-btn svg{display:block}
+.topbar-search-btn[aria-expanded="true"]{background:#272727}
+.like-icon svg{
+  width:26px;
+  height:26px;
+  display:block;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.side-item .like-icon.side-like{
+  display:inline-flex;
+  align-items:center;
+}
+.side-item .like-icon.side-like img{width:20px;height:20px;display:block;filter:brightness(0) invert(1)}
+
+.side-item-group{width:100%}
+.side-item-toggle{position:relative;justify-content:flex-start}
+.side-chevron{
+  margin-left:auto;
+  font-size:11px;
+  color:#aaa;
+  transition:transform .15s ease;
+  flex:0 0 auto;
+}
+.side-item-group.open .side-chevron{transform:rotate(90deg)}
+.side-submenu{
+  display:none;
+  flex-direction:column;
+  margin:0;
+  padding:0 0 0 12px;
+  background:transparent;
+}
+.side-item-group.open .side-submenu{display:flex}
+.home-page .side-item.side-subitem{height:40px;padding:0 12px}
+.side-subitem{height:40px}
+.side-subitem .side-icon{width:20px;flex:0 0 20px;display:flex;align-items:center}
+
+/* "You" section heading — muted/smaller than Folders/Playlists */
+.side-title{font-weight:700;padding:8px 15px;display:flex;align-items:center;gap:10px}
+.side-title-icon{width:20px;height:20px;flex:0 0 20px;display:flex;align-items:center;justify-content:center;color:#e9e9e9}
+.side-title-toggle{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  background:transparent;
+  border:0;
+  color:#fff;
+  font-weight:700;
+  font-size:14px;
+  padding:8px 15px;
+  cursor:pointer;
+  text-align:left;
+}
+.side-title-toggle .side-title{padding:0}
+.side-title-toggle .side-chevron{margin-left:auto;color:#aaa}
+.side-title-toggle.open .side-chevron{transform:rotate(90deg)}
+
+/* Liked is a collapsible section, just like Folders.  Keep its header
+   height, padding, icon alignment and chevron identical to the Folders
+   header instead of using the larger rounded .side-item treatment. */
+#sidebar .liked-group{margin:0;display:flex;flex-direction:column}
+#sidebar .liked-toggle{min-height:36px;height:36px;margin:0;padding:8px 15px;box-sizing:border-box}
+#sidebar .liked-toggle .side-title-icon{width:20px;height:20px;flex:0 0 20px}
+#sidebar .liked-toggle .side-title-icon img{width:20px;height:20px;display:block;filter:brightness(0) invert(1)}
+#sidebar .liked-toggle .side-title{padding:0}
+#sidebar .liked-toggle:hover,
+#sidebar .liked-toggle:active,
+#sidebar .liked-toggle:focus,
+#sidebar .liked-toggle:focus-visible{background:transparent;outline:none;box-shadow:none}
+#sidebar .liked-submenu{padding:0 0 4px 0}
+#sidebar .liked-submenu .side-subitem{height:40px;padding:0 15px 0 45px;margin:0;border-radius:10px}
+#sidebar .liked-submenu .side-subitem .side-icon{width:20px;flex:0 0 20px}
+#sidebar .liked-submenu .side-subitem:hover{background:#1e1e1e}
+.folder-tree[hidden]{display:none}
+.side-title-muted{color:#aaa;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+
+/* Folders list — flush/transparent, no boxed background (matches Playlists) */
+#folderTree.folder-tree{
+  margin:0;
+  padding:0 0 4px;
+}
+/* Playlists render flush (no boxed container), per reference */
+.playlist-tree{padding:0 0 4px}
+
+/* Prevent the page behind the drawer from scrolling while it's open */
+body.dp-sidebar-locked{overflow:hidden}
+
+.side-signout{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  color:#aaa;
+  text-decoration:none;
+  font-size:14px;
+  padding:12px 15px;
+  border-radius:10px;
+}
+.side-signout:hover{background:#1e1e1e;color:#fff}
+.side-signout svg{flex:0 0 20px}
+.sidebar.collapsed .side-chevron,body:not(.home-page) .sidebar .side-chevron{display:none}
+.sidebar.collapsed .side-submenu,body:not(.home-page) .sidebar .side-submenu{padding-left:0}
+
+.topbar-icons .avatar{
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#19a889;
+  color:#fff;
+  border:0;
+  border-radius:50%;
+  cursor:pointer;
+}
+.topbar-icons .avatar svg{display:block}
+.topbar-icons .avatar .avatar-initial{font-size:15px;font-weight:700;line-height:1;user-select:none}
+.home-hidden-action{display:none!important}
+
+.home-layout{display:block}
+.home-content{
+  width:100%;
+  max-width:1800px;
+  margin:0 auto;
+  padding:0 38px 48px;
+}
+.home-page .chips{
+  position:sticky;
+  top:74px;
+  z-index:50;
+  padding:18px 0 20px;
+  background:#0f0f0f;
+}
+.home-page .chip{
+  padding:11px 20px;
+  border-radius:11px;
+  font-size:14px;
+}
+.home-page .section-head{
+  margin:0 0 24px;
+}
+.home-page .section-head h1{
+  font-size:25px;
+  font-weight:800;
+}
+.home-page .section-head select{
+  min-width:130px;
+  padding:11px 15px;
+  border-radius:12px;
+  font-size:16px;
+}
+.home-page .video-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:38px 20px;
+}
+.home-page .video-card{min-width:0}
+.home-page .thumb{
+  aspect-ratio:16/9;
+  border-radius:13px;
+  background:#1b1b1b;
+}
+.home-page .thumb img{
+  object-fit:cover;
+}
+.home-page .card-row{
+  grid-template-columns:36px minmax(0,1fr) 30px;
+  margin-top:11px;
+}
+.home-page .channel-avatar{
+  width:36px;
+  height:36px;
+}
+.home-page .video-title{
+  font-size:17px;
+  line-height:1.32;
+}
+.home-page .channel,
+.home-page .stats{
+  font-size:14px;
+  margin-top:5px;
+}
+.home-page .more-btn{font-size:24px}
+
+/* Keep every Drive folder out even if an unexpected API response contains one. */
+.home-page .folder-card{display:none!important}
+
+@media (min-width:1500px){
+  .home-content{padding-left:50px;padding-right:50px}
+  .home-page .video-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:42px 22px}
+}
+@media (max-width:1100px){
+  .home-topbar{padding:9px 18px;gap:8px}
+  .topbar-icons{gap:6px}
+  .home-content{padding:0 20px 40px}
+  .home-page .video-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:30px 18px}
+  .home-page .chips{top:74px}
+}
+@media (max-width:700px){
+  .home-topbar{
+    min-height:64px;
+    padding:7px 10px;
+    gap:6px;
+  }
+  .home-brand .brand-logo{width:34px;height:34px}
+  .home-search{
+    height:42px;
+    max-width:none;
+  }
+  .home-search input{
+    font-size:15px;
+    padding:0 14px;
+  }
+  .topbar-icons{gap:4px}
+  .topbar-icons .avatar{
+    width:36px;
+    height:36px;
+    flex-basis:36px;
+  }
+  .home-content{padding:0 12px 30px}
+  .home-page .chips{
+    top:64px;
+    padding:12px 0 15px;
+    gap:8px;
+  }
+  .home-page .chip{
+    padding:9px 14px;
+    font-size:13px;
+  }
+  .home-page .section-head{
+    margin-bottom:18px;
+  }
+  .home-page .section-head h1{font-size:21px}
+  .select-line{top:64px;gap:6px}
+  .filter-tab{padding:7px 10px;font-size:12px}
+  .select-toggle{padding:8px 12px;font-size:13px;gap:5px}
+  .home-page .section-head select{
+    min-width:104px;
+    padding:9px 11px;
+    font-size:14px;
+  }
+  .home-page .video-grid{
+    grid-template-columns:1fr;
+    gap:28px;
+  }
+  .home-page .video-title{font-size:16px}
+}
+
+
+/* ===== MyTube: 4 video cards per row ===== */
+.home-page .video-grid{
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:30px 18px;
+}
+@media (max-width:1099px){
+  .home-page .video-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:26px 16px;
+  }
+}
+@media (max-width:700px){
+  .home-page .video-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:22px 10px;
+  }
+}
+@media (max-width:430px){
+  .home-page .video-grid{
+    grid-template-columns:1fr !important;
+    gap:25px;
+  }
+}
+
+/* ===== Home page: loading skeletons + auto-recommendation transitions ===== */
+/* Cards used to ALL replay a 0.4s staggered fade-in on every render (each tab
+   switch, search keystroke, background refresh), which read as the whole page
+   going blank and reloading. Now only cards that are genuinely new get it
+   (app.js adds .card-enter to the first few), and it's short. */
+.home-page .video-card.card-enter{animation:mtCardIn .22s ease-out both}
+@keyframes mtCardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* The silent background refresh no longer dips the whole grid to 40% opacity. */
+.home-page #grid.refreshing{animation:none}
+.home-page .skel-card{border-radius:11px}
+.home-page .skel-thumb{aspect-ratio:16/9;border-radius:11px;background:linear-gradient(90deg,#1c1c1c 25%,#2b2b2b 37%,#1c1c1c 63%);background-size:400% 100%;animation:mtShimmer2 1.4s ease infinite}
+.home-page .skel-line{height:12px;border-radius:6px;margin-top:10px;background:linear-gradient(90deg,#1c1c1c 25%,#2b2b2b 37%,#1c1c1c 63%);background-size:400% 100%;animation:mtShimmer2 1.4s ease infinite}
+.home-page .skel-line.short{width:60%}
+@keyframes mtShimmer2{0%{background-position:100% 0}100%{background-position:0 0}}
+
+
+/* =========================================================
+   HOME PAGE — hamburger drawer with local storage folder tree
+   ========================================================= */
+.sidebar-backdrop{display:none;position:fixed;inset:0;background:#000a;z-index:190}
+.sidebar-backdrop.show{display:block}
+.home-page .sidebar{
+  display:flex;
+  flex-direction:column;
+  position:fixed;
+  top:0;
+  left:0;
+  width:300px;
+  max-width:85vw;
+  height:100vh;
+  background:#0f0f0f;
+  border-right:1px solid #222;
+  padding:0 8px 24px;
+  transform:translateX(-100%);
+  transition:transform .22s ease;
+  z-index:200;
+  overflow-y:auto;
+}
+.home-page .sidebar.open{transform:translateX(0)}
+.home-page .sidebar{scrollbar-width:thin;scrollbar-color:#555 #0f0f0f}
+.home-page .sidebar::-webkit-scrollbar{width:8px}
+.home-page .sidebar::-webkit-scrollbar-track{background:#0f0f0f}
+.home-page .sidebar::-webkit-scrollbar-thumb{background:#555;border-radius:8px}
+.home-page .sidebar::-webkit-scrollbar-thumb:hover{background:#777}
+.sidebar-head{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:14px 8px;
+  position:sticky;
+  top:0;
+  background:#0f0f0f;
+  z-index:1;
+}
+.sidebar-logo{width:24px;height:24px;border-radius:8px;object-fit:cover}
+.sidebar-title{font-weight:700;font-size:17px;flex:1}
+.sidebar-close{font-size:24px}
+.folder-tree{padding:0 0 4px}
+.folder-list{display:flex;flex-direction:column}
+.folder-node{width:100%}
+.folder-row{display:flex;align-items:center;gap:2px;border-radius:10px}
+.folder-row:hover{background:#1d1d1d}
+.folder-row.active{background:#272727}
+.folder-toggle{
+  flex:0 0 26px;
+  width:26px;
+  height:36px;
+  border:0;
+  background:transparent;
+  color:#aaa;
+  font-size:11px;
+  cursor:pointer;
+  transition:transform .15s ease;
+}
+.folder-toggle.open{transform:rotate(90deg)}
+.folder-toggle-spacer{display:inline-block;width:26px;flex:0 0 26px}
+/* Playlist rows have no expand-caret (only folders do), so the spacer
+   reserved for that caret just pushes the playlist icon out of line with
+   the "Playlists" header icon above it. Shrink it to match that header's
+   left offset instead of the folder-toggle's width. */
+.playlist-tree .folder-toggle-spacer{width:9px;flex:0 0 9px}
+.folder-link{
+  flex:1;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+  height:40px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  font-size:14px;
+  text-align:left;
+  cursor:pointer;
+  padding:0 8px 0 0;
+}
+.folder-link span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-row{position:relative}
+.folder-menu-btn{border:0;background:transparent;color:#fff;font-size:18px;cursor:pointer;padding:0 10px;min-width:40px;height:40px;line-height:1;opacity:.65;flex:0 0 auto;touch-action:manipulation}
+.folder-menu-btn:hover{opacity:1}
+.folder-menu{display:none;position:absolute;right:6px;top:100%;z-index:20;background:#282828;border-radius:10px;padding:6px;box-shadow:0 6px 25px #000;min-width:210px;max-height:320px;overflow-y:auto}
+/* Playlist menus are promoted above the scrolling drawer and positioned by sidebar.js. */
+.playlist-menu{position:fixed;left:0;top:0;right:auto;z-index:1000}
+.folder-menu.open{display:block}
+.folder-menu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:#fff;padding:10px;border-radius:7px;cursor:pointer;font-size:13px}
+.folder-menu button:hover{background:#3a3a3a}
+.folder-menu button.unmerge-btn{color:#ff6b6b}
+.folder-menu button.unmerge-btn:hover{background:#3a2020}
+.folder-menu-divider{height:1px;background:#3a3a3a;margin:6px 4px}
+.folder-menu-label{font-size:11px;color:#8ab4f8;padding:2px 10px 4px;text-transform:uppercase;letter-spacing:.03em}
+.merged-child-row{display:flex;align-items:center;gap:2px}
+.merged-child-row .folder-link{flex:1;min-width:0;padding:8px 6px}
+.merged-child-row .unmerge-btn{width:auto;flex:0 0 auto;padding:8px 10px}
+.folder-merge-list{max-height:280px;overflow-y:auto;margin-bottom:12px}
+.folder-merge-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-radius:7px;cursor:pointer}
+.folder-merge-item:hover{background:#333}
+.folder-merge-item span{color:#fff;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-row.active .folder-link{color:#3ea6ff;font-weight:700}
+.folder-children{overflow:hidden}
+.folder-header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:4px 0 18px}.folder-header[hidden]{display:none}
+.folder-header h1{font-size:20px;margin:0}
+.folder-clear{color:#aaa;text-decoration:none;font-size:13px;white-space:nowrap}
+.folder-clear:hover{color:#fff}
+button.folder-clear{background:transparent;border:0;cursor:pointer;font:inherit;padding:0}
+.playlist-header-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.side-title-row{display:flex;align-items:center;justify-content:space-between;padding-right:8px}
+.side-title-row .side-title{padding-right:0}
+.side-title-action{background:transparent;border:0;color:#aaa;font-size:16px;line-height:1;cursor:pointer;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center}
+.side-title-action:hover{background:#272727;color:#fff}
+.side-title-action-icon{width:16px;height:16px;object-fit:contain;filter:invert(1);opacity:.7}
+.side-title-action:hover .side-title-action-icon{opacity:1}
+.menu-icon.icon-invert{filter:invert(1)}
+.pl-modal-list{display:flex;flex-direction:column;gap:2px;max-height:280px;overflow:auto;margin-bottom:16px}
+.pl-modal-item{display:flex;align-items:center;gap:12px;padding:9px 6px;border-radius:8px;cursor:pointer}
+.pl-modal-item:hover{background:#333}
+.pl-modal-item input{width:18px;height:18px;flex:none}
+.pl-modal-create{display:flex;gap:8px}
+.pl-modal-create input{flex:1;min-width:0;background:#1c1c1c;border:1px solid #3a3a3a;border-radius:8px;color:#fff;padding:10px 12px;font-size:14px}
+.pl-modal-create button{border:0;background:#3ea6ff;color:#0f0f0f;font-weight:700;border-radius:8px;padding:0 16px;cursor:pointer}
+.pl-modal-create button:disabled{opacity:.6;cursor:default}
+@media(max-width:700px){
+  .home-page .sidebar{width:82vw}
+  .home-page .side-item{height:46px;margin:1px 0;padding:0 12px;gap:16px}
+  .home-page .side-item-group{margin:1px 0}
+  .home-page .side-item-group .side-item-toggle{margin:0}
+  .home-page .side-submenu{gap:0;padding:0 0 0 10px}
+  .home-page .side-submenu .side-item,.home-page .side-item.side-subitem{height:38px;margin:1px 0}
+  .home-page #folderTree.folder-tree,.home-page .folder-tree{margin:0;padding:0 0 2px}
+  .home-page .side-title,.home-page .side-title-toggle,.home-page .side-title-row{padding:6px 12px}
+  .home-page .side-divider{margin:6px 0}
+}
+
+/* =========================================================
+   HOME PAGE — Favorite button icon (star)
+   ========================================================= */
+.home-page .fav-icon{
+  display:inline-block;
+  width:22px;
+  height:22px;
+  background-color:currentColor;
+  -webkit-mask:url(/icons/star.svg) center/contain no-repeat;
+  mask:url(/icons/star.svg) center/contain no-repeat;
+  vertical-align:middle;
+  flex:none;
+}
+.home-page .side-item .fav-icon.side-fav-icon{width:22px;height:22px}
+.home-page .fav-btn{display:flex;align-items:center;gap:8px}
+.home-page .fav-btn .fav-icon{width:15px;height:15px}
+.home-page .fav-btn.is-fav{color:#ff4d6d;font-weight:700}
+.home-page .fav-btn.is-fav .fav-icon{background-color:#ff4d6d}
+
+/* =========================================================
+   HOME PAGE — sidebar row/icon redesign (rounded pill rows)
+   ========================================================= */
+.home-page .side-item{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  width:100%;
+  height:52px;
+  padding:0 14px;
+  margin:2px 0;
+  background:transparent;
+  border:0;
+  color:#e9e9e9;
+  text-decoration:none;
+  border-radius:14px;
+  cursor:pointer;
+  text-align:left;
+  font-size:15px;
+}
+.home-page .side-item-group{margin:2px 0;display:flex;flex-direction:column}
+.home-page .side-item-group .side-item-toggle{margin:0}
+.home-page .side-submenu .side-item{margin:2px 0}
+
+/* The "Liked" row is a <button> wrapped in a group div (for the expandable
+   submenu), while every other row is a plain <a class="side-item">. Pin its
+   box model with maximum specificity + !important so it always renders at
+   the exact same height as the rest of the rows, no matter what other rule
+   (or screen-density/appearance quirk) might otherwise inflate it. */
+.home-page .side-item-group .side-item.side-item-toggle{
+  height:52px!important;
+  min-height:0!important;
+  max-height:52px!important;
+  box-sizing:border-box!important;
+  padding:0 14px!important;
+  margin:0!important;
+  line-height:normal!important;
+  -webkit-appearance:none;
+  appearance:none;
+  overflow:hidden;
+}
+.home-page .side-item-group .side-chevron{line-height:1;flex-shrink:0}
+.home-page .side-item-group .side-icon{line-height:0}
+.home-page .side-item:first-letter{font-size:15px}
+.home-page .side-item span{font-size:15px}
+.home-page .side-item:hover{background:#1e1e1e}
+.home-page .side-item.active{
+  background:linear-gradient(90deg,#4a1414,#551717);
+  font-weight:700;
+  color:#fff;
+  position:relative;
+  overflow:hidden;
+}
+.home-page .side-icon{
+  flex:0 0 24px;
+  width:24px;
+  height:24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#e9e9e9;
+}
+.home-page .side-item.active .side-icon{color:#fff}
+.home-page .side-icon svg{width:24px;height:24px;display:block}
+.home-page .side-icon.like-icon img{width:22px;height:22px}
+.home-page .side-icon.fav-icon{width:22px;height:22px}
+
+/* ===== Filter tabs + Multi-select ===== */
+/* Sticky so the filter tabs and Select toggle/toolbar stay visible under
+   the topbar instead of scrolling out of view with the video grid. */
+.select-line{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 14px;position:sticky;top:74px;z-index:55;background:#0f0f0f;padding:10px 0;flex-wrap:nowrap}
+.filter-tabs{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0}
+.filter-tab{flex:1 1 0;min-width:0;border:1px solid #333;background:#181818;color:#e9e9e9;padding:8px 16px;border-radius:18px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.filter-tab:hover{background:#272727}
+.filter-tab.active{background:#fff;color:#111;border-color:#fff}
+.select-line.is-selecting .filter-tabs{display:none}
+.select-line.is-selecting .select-bar{flex:1 1 auto}
+@media (max-width:400px){
+  .select-line{gap:5px}
+  .filter-tabs{gap:5px}
+  .filter-tab{padding:6px 6px;font-size:11px}
+  .select-toggle{padding:7px 10px;font-size:12px;gap:4px}
+}
+.select-bar{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex:0 0 auto}
+.select-toggle{display:flex;align-items:center;gap:7px;border:1px solid #444;background:#181818;color:#fff;padding:9px 16px;border-radius:20px;cursor:pointer;font-size:14px;font-weight:600}
+.select-toggle:hover{background:#272727}
+.select-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%;background:#181818;border:1px solid #303030;border-radius:14px;padding:10px 14px}
+.select-cancel{border:0;background:transparent;color:#fff;cursor:pointer;font-size:14px;padding:8px 10px;border-radius:8px}
+.select-cancel:hover{background:#272727}
+.select-count{font-weight:700;font-size:14px;margin-right:auto}
+.select-all-btn{border:1px solid #444;background:transparent;color:#fff;cursor:pointer;font-size:13px;padding:8px 12px;border-radius:16px}
+.select-all-btn:hover{background:#272727}
+.select-actions{display:flex;gap:8px;flex-wrap:wrap}
+.select-actions button{display:flex;align-items:center;gap:6px;border:0;background:#272727;color:#fff;cursor:pointer;font-size:13px;padding:9px 14px;border-radius:16px;font-weight:600}
+.select-actions button:hover:not(:disabled){background:#3a3a3a}
+.select-actions button:disabled{opacity:.4;cursor:default}
+.select-actions button.delete-btn{color:#ff6b6b}
+.select-actions button.delete-btn:hover:not(:disabled){background:#3a2020}.select-bulk-cancel{border:0;background:#3a2020;color:#ff6b6b;cursor:pointer;font-size:13px;padding:9px 14px;border-radius:16px;font-weight:600}.select-bulk-cancel:hover:not(:disabled){background:#4a2626}.select-bulk-cancel:disabled{opacity:.6;cursor:default}.card-menu button.dl-inline-cancel{color:#ff6b6b;font-size:12px;padding-top:2px}.card-menu button.dl-inline-cancel:hover{background:#3a2020}
+.dl-bg-note{margin:2px 0 0;font-size:11px;color:#8ab4f8;padding:0 10px}
+.dl-bg-tag{font-size:11px;color:#8ab4f8;font-weight:600}
+.dl-bg-tag.dl-bg-tag-fg{color:#ffb74d}
+.select-actions .fav-icon{width:15px;height:15px}
+.select-check{position:absolute;left:9px;top:9px;width:22px;height:22px;border-radius:5px;border:2px solid #fff;background:#0007;z-index:2;display:none}
+.select-check::after{content:"";position:absolute;left:5px;top:1px;width:6px;height:11px;border-right:3px solid #fff;border-bottom:3px solid #fff;transform:rotate(40deg);opacity:0}
+.select-check.checked{background:#3ea6ff;border-color:#3ea6ff}
+.select-check.checked::after{opacity:1}
+.video-grid.select-mode .select-check{display:block}
+.video-grid.select-mode .thumb{cursor:pointer}
+.video-grid.select-mode .thumb-play{display:none!important}
+.video-grid.select-mode .more-btn{visibility:hidden}
+.video-card.is-selected .thumb{outline:3px solid #3ea6ff;outline-offset:-3px}
+.video-card.is-selected .thumb img{opacity:.85}
+@media(max-width:700px){
+  .select-toolbar{gap:8px}
+  .select-count{width:100%;order:-1;margin-right:0}
+  .select-actions{width:100%}
+  .select-actions button{padding:8px 10px;font-size:12px}
+}
+
+/* ---- Home page bottom navigation (Home / Shorts / History / You) ----
+   Mobile-app style tab bar shown only on the home page. Auto-hides on
+   scroll down, reappears on scroll up (see app.js). */
+.home-bottom-nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:70;
+  display:flex;align-items:stretch;
+  max-width:520px;margin:0 auto;
+  height:58px;padding-bottom:env(safe-area-inset-bottom,0px);
+  background:rgba(15,15,15,.97);
+  border-top:1px solid #222;
+  transition:transform .25s ease;
+}
+.home-bottom-nav.hide{transform:translateY(100%)}
+.home-bnav-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:#9a9a9a;text-decoration:none;background:transparent;border:0;cursor:pointer;font-size:11px;
+}
+.home-bnav-item:hover{color:#ddd}
+.home-bnav-item.active{color:#fff}
+.home-bnav-icon{width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+.home-bnav-icon svg{width:23px;height:23px}
+.shorts-nav-icon{width:22px;height:22px;object-fit:contain;display:block;filter:invert(1)}
+.home-bnav-avatar{
+  width:23px;height:23px;border-radius:50%;background:#19a889;color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+}
+.home-page .home-content{padding-bottom:106px}
+.home-page .toast{bottom:calc(58px + env(safe-area-inset-bottom,0px) + 20px)}
+@media (max-width:700px){
+  .home-page .home-content{padding-bottom:88px}
+}
+
+/* Bottom nav is a mobile/tablet pattern only — hide it on desktop and
+   give the page back its normal bottom spacing there. */
+@media (min-width:1025px){
+  .home-bottom-nav{display:none}
+  .home-page .home-content{padding-bottom:48px}
+  .home-page .toast{bottom:28px}
+}
+.offline-banner{position:sticky;top:0;z-index:60;background:#3a2f10;color:#ffd77a;font-size:13px;text-align:center;padding:9px 14px;border-bottom:1px solid #5a4a1a}
+.offline-banner[hidden]{display:none}
+
+/* ===== Player card redesign (top bar, control bar, action bar) ===== */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Top overlay bar: title on the left, cast + settings on the right */
+.watch-page .player-topbar{
+  position:absolute;
+  left:0;right:0;top:0;
+  z-index:6;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:14px 16px;
+  background:linear-gradient(#000a,transparent);
+  pointer-events:none;
+}
+.watch-page .player-topbar-left{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex:1;
+  min-width:0;
+  pointer-events:auto;
+}
+.watch-page .pip-collapse-btn{flex:none;margin-left:-8px}
+.watch-page .pip-collapse-btn svg{transition:transform .18s cubic-bezier(.4,0,.2,1)}
+.watch-page .pip-collapse-btn.tap svg{animation:dpChevronTap .32s cubic-bezier(.4,0,.2,1)}
+@keyframes dpChevronTap{
+  0%{transform:translateY(0) scale(1)}
+  40%{transform:translateY(3px) scale(.85)}
+  100%{transform:translateY(0) scale(1)}
+}
+/* Played once PiP has actually engaged: the player visually "collapses"
+   toward the bottom-right corner, echoing where the floating PiP window
+   will land, before we navigate away. */
+.watch-page .player.pip-collapsing{
+  animation:dpPipCollapse .32s cubic-bezier(.4,0,.2,1) forwards;
+  pointer-events:none;
+}
+@keyframes dpPipCollapse{
+  0%{transform:scale(1) translate(0,0);opacity:1;border-radius:12px}
+  100%{transform:scale(.22) translate(34vw,28vh);opacity:0;border-radius:18px}
+}
+.watch-page .player-topbar-actions{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  pointer-events:auto;
+  flex:none;
+}
+.watch-page .topbar-icon-btn{
+  border:0;
+  background:transparent;
+  color:#fff;
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:background .12s ease-out,transform .12s cubic-bezier(.4,0,.2,1);
+}
+.watch-page .topbar-icon-btn:hover{background:#ffffff26}
+.watch-page .topbar-icon-btn:active{transform:scale(.9);background:#ffffff33}
+.watch-page .topbar-icon-btn[hidden]{display:none}
+/* Cast icon removed from the top bar. */
+.watch-page #moreCastBtn.topbar-icon-btn{display:none !important}
+.watch-page .topbar-icon-svg{display:flex;align-items:center;justify-content:center}
+@media(max-width:600px),(pointer:coarse) and (hover:none){
+  .watch-page .player-topbar{padding:10px 12px}
+  .watch-page .topbar-icon-btn{width:32px;height:32px}
+}
+/* Fade the top bar out together with the bottom controls, where supported */
+.watch-page .player:has(> #controls.auto-hidden) .player-topbar{
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .12s cubic-bezier(.4,0,.2,1);
+}
+.watch-page .player-topbar{transition:opacity .12s cubic-bezier(.4,0,.2,1)}
+
+/* Settings menu: "Video quality" row reuses the more-menu-item layout via
+   a generated label, so the existing quality-label JS (which sets the
+   button's own text to the current resolution) keeps working untouched. */
+.watch-page .more-menu-item.quality-item{color:#aaa;font-size:13px}
+.watch-page .more-menu-item.quality-item::before{content:"Video quality";color:#fff;font-size:14px}
+
+/* Bottom action bar: Like / Download / Save stay visible; everything else
+   (Playlist, Save, Rename, Download offline, Share, Details, Delete) moves
+   into a "More" popup, sized to match the settings (⚙) popup's rows rather
+   than oversized reference-card icon badges. */
+.watch-page .actions-more-wrap{position:relative}
+.watch-page .actions-more-trigger{display:inline-flex;align-items:center;gap:6px}
+.watch-page .actions-more-dots{font-weight:700;letter-spacing:1px}
+/* Base display:none / .show rule for .actions-more-menu now lives earlier
+   in the file, above the "Phone" media query - see the comment there. */
+.watch-page .actions-more-menu .more-menu-item{
+  display:flex;
+  flex-direction:row-reverse;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  text-align:left;
+  padding:9px 11px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  border-radius:7px;
+  cursor:pointer;
+  font-size:14px;
+  white-space:nowrap;
+}
+.watch-page .actions-more-menu .more-menu-item:hover{background:#3a3a3a}
+.watch-page .actions-more-menu .more-menu-item[hidden]{display:none}
+.watch-page .actions-more-menu .more-menu-icon{
+  flex:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:19px;
+  height:19px;
+  font-size:15px;
+  color:#ccc;
+  line-height:1;
+}
+.watch-page .actions-more-menu .more-menu-label{overflow:hidden;text-overflow:ellipsis}
+.watch-page .actions-more-menu .more-menu-icon .fav-icon-wrap,
+.watch-page .actions-more-menu .more-menu-icon .like-icon-wrap{margin-right:0;vertical-align:0}
+.watch-page .actions-more-menu .more-menu-icon .fav-svg{width:17px;height:17px}
+.watch-page .actions-more-menu .more-menu-svg{width:17px;height:17px}
+.watch-page .actions-more-menu .action-icon{width:17px;height:17px;object-fit:contain;filter:invert(1)}
+.watch-page .actions-more-menu .action-icon.icon-plain{filter:none}
+/* Delete: the one destructive row, called out in red like everywhere else
+   delete already is in this app (card menu, etc.) */
+.watch-page .actions-more-menu .more-menu-item.danger{color:#ff6b6b}
+.watch-page .actions-more-menu .more-menu-item.danger:hover{background:#3a2020}
+.watch-page .actions-more-menu .more-menu-item.danger .action-icon.icon-plain{filter:invert(37%) sepia(70%) saturate(3000%) hue-rotate(325deg) brightness(100%)}
+.watch-page .fullscreen-btn{display:flex;align-items:center;justify-content:center}
+
+/* Laptop/desktop: anchor the "More" popup right under its trigger button
+   instead of the fixed bottom-sheet meant for touch screens (base rule
+   near the top of the file). Same (min-width:601px) and (hover:hover) and
+   (pointer:fine) check watch.js already uses for the ⋮ settings popup's
+   anchored positioning, so this only kicks in on mouse/laptop screens —
+   phones keep the bottom sheet untouched. */
+@media (min-width:601px) and (hover:hover) and (pointer:fine){
+  .watch-page .actions-more-menu{
+    position:absolute;
+    left:0;
+    right:auto;
+    top:calc(100% + 8px);
+    bottom:auto;
+    width:max-content;
+    min-width:200px;
+    max-width:280px;
+    max-height:none;
+    border-radius:10px;
+    padding:6px;
+    box-shadow:0 6px 25px #000a;
+  }
+  .watch-page .actions-more-menu::before{display:none}
+}
+
+/* Details modal (opened from the More popup) — reuses the site-wide
+   .modal/.modal-card shell already used elsewhere. */
+.details-body{margin-top:6px}
+.details-row{display:flex;justify-content:space-between;gap:18px;padding:10px 0;border-bottom:1px solid #3a3a3a}
+.details-row:last-child{border-bottom:0}
+.details-key{color:#aaa;flex:none}
+.details-val{color:#fff;text-align:right;word-break:break-word}
+
+
+/* =========================================================
+   DRAWER — Playlists section layout
+   The "Playlists" header lines up with the "Folders" header directly
+   above it — same icon inset, same text start — so the two rows read
+   as one consistent list. The playlists listed underneath still indent
+   further RIGHT (same indent as the children inside the Folders tree).
+   Tweak the two numbers below to nudge either side:
+     --pl-head-left : gap before the "Playlists" header icon (match Folders' 15px)
+     --pl-row-indent: gap before each created playlist's icon (bigger = more right)
+   Applies to every page (home + watch) because they all share this markup.
+   ========================================================= */
+#sidebar{
+  --pl-head-left:15px;
+  --pl-row-indent:28px;
+}
+/* "Playlists" header is now a button that expands/collapses the list
+   (the + button stays beside it). Same look as before, plus a chevron. */
+.side-playlists-toggle{
+  flex:1 1 auto;min-width:0;
+  background:transparent;border:0;color:inherit;font:inherit;font-weight:700;font-size:14px;
+  text-align:left;cursor:pointer;border-radius:10px;
+}
+.side-playlists-toggle .side-chevron{margin-left:auto;padding-right:6px;color:#aaa}
+.side-playlists-toggle.open .side-chevron{transform:rotate(90deg)}
+#sidebar .side-title-row.playlists-head{padding-left:0}
+#sidebar .side-title-row.playlists-head .side-title{padding-left:var(--pl-head-left)}
+#sidebar .playlist-tree .folder-toggle-spacer{
+  width:var(--pl-row-indent);
+  flex:0 0 var(--pl-row-indent);
+}
+
+
+/* =========================================================
+   DRAWER — never scroll the page behind the open hamburger menu
+   - body.dp-sidebar-locked is set by sidebar.js / app.js / watch.js
+   - :has() form also locks it if any script forgets the class
+   - the dimmed backdrop swallows touch-drags (touch-action:none)
+   - the drawer keeps its own scroll and doesn't chain it to the page
+   ========================================================= */
+html:has(body.dp-sidebar-locked),
+html:has(#sidebar.open){overflow:hidden;overscroll-behavior:none}
+body.dp-sidebar-locked,
+body:has(#sidebar.open){overflow:hidden;overscroll-behavior:none}
+.sidebar-backdrop{touch-action:none;overscroll-behavior:contain}
+#sidebar,.sidebar{overscroll-behavior:contain}
+
+/* Liked section header must stay neutral; expansion is shown only by the chevron. */
+html body #likedToggle,
+html body #likedToggle:hover,
+html body #likedToggle:active,
+html body #likedToggle:focus,
+html body #likedToggle:focus-visible{
+  background:transparent!important;
+  background-image:none!important;
+  box-shadow:none!important;
+  outline:none!important;
+  -webkit-tap-highlight-color:transparent!important;
+}
+
+/* =========================================================
+   Liked drawer row — match Home / Photos / Favorites alignment
+   while keeping Liked as a compact expandable section like Folders.
+   ========================================================= */
+.home-page #sidebar .liked-toggle,
+#sidebar .liked-toggle{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  width:100%;
+  height:52px;
+  min-height:52px;
+  max-height:52px;
+  margin:0;
+  padding:0 14px;
+  box-sizing:border-box;
+  background:transparent;
+  border:0;
+  border-radius:14px;
+  color:#e9e9e9;
+  font-size:15px;
+  font-weight:400;
+  line-height:normal;
+  text-align:left;
+  cursor:pointer;
+}
+.home-page #sidebar .liked-toggle .side-title,
+#sidebar .liked-toggle .side-title{
+  padding:0;
+  margin:0;
+  font-size:15px;
+  font-weight:400;
+  line-height:normal;
+  color:inherit;
+}
+.home-page #sidebar .liked-toggle .side-title-icon,
+#sidebar .liked-toggle .side-title-icon{
+  width:24px;
+  height:24px;
+  flex:0 0 24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.home-page #sidebar .liked-toggle .side-title-icon img,
+#sidebar .liked-toggle .side-title-icon img{
+  width:24px;
+  height:24px;
+  display:block;
+}
+.home-page #sidebar .liked-toggle .side-chevron,
+#sidebar .liked-toggle .side-chevron{
+  margin-left:auto;
+  font-size:16px;
+  line-height:1;
+  color:#aaa;
+  flex:0 0 auto;
+}
+.home-page #sidebar .liked-toggle:hover,
+#sidebar .liked-toggle:hover,
+.home-page #sidebar .liked-toggle:active,
+#sidebar .liked-toggle:active,
+.home-page #sidebar .liked-toggle:focus,
+#sidebar .liked-toggle:focus,
+.home-page #sidebar .liked-toggle:focus-visible,
+#sidebar .liked-toggle:focus-visible{
+  background:transparent;
+  outline:none;
+  box-shadow:none;
+}
+
+/* ===== Performance: cheaper loading placeholders ===== */
+/* A card whose thumbnail is still being generated used to animate a
+   background-position gradient. That repaints the card every frame, and a
+   backlog of missing thumbnails means dozens of these at once - the main
+   cause of scroll/tap jank while new thumbnails load. Pulse an overlay's
+   opacity instead (composited, no repaint). */
+.thumb.thumb-pending{background:#242424;animation:none}
+.thumb.thumb-pending::before{content:"";position:absolute;inset:0;background:#3a3a3a;opacity:0;pointer-events:none;animation:mtPendingPulse 1.4s ease-in-out infinite}
+@keyframes mtPendingPulse{0%,100%{opacity:0}50%{opacity:.6}}
+.home-page .skel-thumb,.home-page .skel-line{animation:mtPendingPulse 1.4s ease-in-out infinite;background:#242424}
+@media (prefers-reduced-motion:reduce){.thumb.thumb-pending::before,.home-page .skel-thumb,.home-page .skel-line{animation:none}}
+/* Tiles are small and numerous: let the browser skip layout/paint for the
+   ones that are off-screen. (Not applied to .video-card: its dropdown menu
+   overflows the card box and would be clipped.) */
+.photo-tile{content-visibility:auto;contain-intrinsic-size:auto 180px}
+
+/* ===== Select button = same size/shape as the All/Videos/Shorts/Photos tabs =====
+   The .select-toggle base rule sits after its own media-query overrides, so
+   those never applied and the button rendered larger than the tabs. Declared
+   last here, mirroring .filter-tab at every breakpoint. */
+.select-toggle{padding:8px 16px;font-size:13px;font-weight:600;gap:6px;border:1px solid #333;border-radius:18px;line-height:normal;white-space:nowrap}
+@media (max-width:700px){.select-toggle{padding:7px 10px;font-size:12px;gap:5px}}
+@media (max-width:400px){.select-toggle{padding:6px 8px;font-size:11px;gap:4px}}
+/* Make Select exactly the same width and height as each tab: the tab row's
+   wrapper is flattened (display:contents) so the four tabs and the Select
+   button are five equal grid columns in one row. */
+.filter-tab,.select-toggle{line-height:16px;box-sizing:border-box}
+.select-line:not(.no-tabs):not(.is-selecting) .filter-tabs{display:contents}
+.select-line:not(.no-tabs):not(.is-selecting){display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch}
+.select-line:not(.no-tabs):not(.is-selecting) .select-bar{min-width:0;display:block}
+.select-line:not(.no-tabs):not(.is-selecting) .select-toggle{width:100%;height:100%;justify-content:center}
+/* With no tabs beside it (Liked, History, folders, playlists), Select still sits on the right. */
+.select-line.no-tabs{justify-content:flex-end}
+.select-line.no-tabs:not(.is-selecting) .select-bar{margin-left:auto;flex:0 0 auto}
+
+/* On phones, a small right-aligned Select button on these tab-less pages
+   (Favorites, Watch later, History, a folder, a playlist) sits alone with
+   nothing else on the row to anchor it against, so it reads as randomly
+   placed rather than deliberately positioned. Stretch it to the full
+   row width instead — the same large, thumb-friendly, clearly-placed
+   button the tabbed pages get, just without tabs beside it. */
+@media(max-width:700px){
+  .select-line.no-tabs:not(.is-selecting){
+    display:flex;
+  }
+  .select-line.no-tabs:not(.is-selecting) .select-bar{
+    width:100%;margin-left:0;display:flex;
+  }
+  .select-line.no-tabs:not(.is-selecting) .select-toggle{
+    width:100%;justify-content:center;
+  }
+}
+
+/* On phones the 5-equal-column row above (4 tabs + Select) leaves each
+   label only about a fifth of the screen — not enough room for "Videos"
+   or "☑ Select" without truncating, which is what made Select look
+   squeezed/cut off on the Liked view once its tabs started showing there
+   too. Below 700px, give the tabs their own full-width row and drop
+   Select onto a second row underneath, right-aligned, sized to its own
+   content instead of a cramped grid cell. */
+@media(max-width:700px){
+  .select-line:not(.no-tabs):not(.is-selecting){
+    display:flex;flex-wrap:wrap;grid-template-columns:none;
+  }
+  .select-line:not(.no-tabs):not(.is-selecting) .filter-tabs{
+    display:flex;flex:1 1 100%;order:1;
+  }
+  .select-line:not(.no-tabs):not(.is-selecting) .select-bar{
+    order:2;flex:0 0 auto;margin-left:auto;margin-top:6px;display:flex;
+  }
+  .select-line:not(.no-tabs):not(.is-selecting) .select-toggle{
+    width:auto;height:auto;
+  }
+}
+
+/* ==== Motion polish =========================================================
+   Purely additive, and everything that moves is inside a reduced-motion guard,
+   so people who ask their device for less motion get exactly the old behaviour.
+
+   - Animations use the individual `translate` / `scale` properties (not
+     `transform`), which compose with any `transform` an element already has
+     instead of replacing it - so nothing that's positioned with translate(-50%)
+     can jump.
+   - Press-shrink is limited to COMPACT controls on purpose. Shrinking a large
+     tappable box (a thumbnail, a wide row) under your finger can make a tap near
+     its edge miss, which is the opposite of "clicks instantly". Wide rows get a
+     geometry-neutral background flash instead.
+   - Popups/modals used to just appear (display:none -> block). They now ease in
+     over ~150ms. (Closing stays instant, on purpose - it never makes you wait.) */
+@keyframes dpPop{from{opacity:0;translate:0 6px;scale:.97}to{opacity:1;translate:0 0;scale:1}}
+@keyframes dpModalIn{from{opacity:0;translate:0 10px;scale:.96}to{opacity:1;translate:0 0;scale:1}}
+@keyframes dpFade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:no-preference){
+  /* Compact controls: quick press-in now, springy release (see the global
+     transition near the top of this file). */
+  :is(.icon-btn,.chip,.create-btn,.more-btn,.action-btn,.filter-tab,.avatar):not(:disabled):active{
+    scale:.94;transition:opacity 0s,scale .07s ease-out}
+  /* Wide rows: instant colour flash, no size change. */
+  .side-item:active{background:#3a3a3a}
+  .card-menu button:active{background:#454545}
+  /* Entrances. `backwards` fill only - nothing is left "held" after the
+     animation ends, so later state changes behave exactly as before. */
+  .card-menu.open,.speed-menu.show,.more-menu.show,.actions-more-menu.show,
+  .quality-menu.show,.folder-menu.open{animation:dpPop .14s cubic-bezier(.2,.9,.3,1) backwards}
+  .modal.show{animation:dpFade .16s ease backwards}
+  .modal.show .modal-card{animation:dpModalIn .2s cubic-bezier(.2,.9,.3,1) backwards}
+  .photo-viewer.show{animation:dpFade .16s ease backwards}
+}
+
+/* Hover preview: show only the watched portion - no pre-roll sweep, no track */
+.thumb .thumb-loadbar{background:rgba(255,255,255,.85);box-shadow:none;border:0;transition:none}
+.thumb.loading .thumb-loadbar{display:none;animation:none}
+.thumb:not(.previewing) .thumb-loadbar{display:none}
+
+/* Hover preview line: pure overlay on the bottom edge of the video - reserves no space, no backing strip */
+.thumb .thumb-loadbar{top:auto;bottom:0;height:3px;background:#fff;opacity:.9;border-radius:0;pointer-events:none;mix-blend-mode:normal;z-index:3}
+.thumb .thumb-preview{background:transparent}
+.thumb.previewing{background:transparent}
+
+/* One identical progress line for every preview card (home/search/library + watch-page recs),
+   forward (left->right) and reverse (right->left) */
+.thumb-loadbar,.rec-thumb .thumb-loadbar{position:absolute;top:0;left:0;right:auto;height:3px;width:0;background:rgba(255,255,255,.85);box-shadow:none;border:0;border-radius:0;transition:none;z-index:2;pointer-events:none;display:none}
+.thumb-loadbar.from-right,.rec-thumb .thumb-loadbar.from-right{left:auto;right:0}
+.thumb.previewing .thumb-loadbar,.rec-thumb.previewing .thumb-loadbar{display:block}
+.thumb.loading .thumb-loadbar,.rec-thumb.loading .thumb-loadbar{display:none;animation:none}
+
+/* Watch-page recommendation cards: same hover behaviour as home-page cards.
+   No play-icon overlay on hover; hover zoom + preview fade like .thumb. */
+.watch-page .rec-card:hover .rec-play,
+.watch-page .up-next-card:hover .rec-play,
+.watch-page .rec-thumb:hover .rec-play,
+.watch-page .rec-thumb.loading .rec-play,
+.watch-page .rec-thumb.previewing .rec-play{opacity:0!important;display:none!important}
+.watch-page .rec-thumb img{transition:transform .2s,opacity .15s ease}
+.watch-page .rec-thumb:hover img{transform:scale(1.025)}
+.watch-page .rec-thumb.previewing img{opacity:0}
+.watch-page .rec-thumb.previewing .rec-thumb-preview{opacity:1}
+
+/* Photo viewer zoom */
+.photo-viewer-img{touch-action:none;user-select:none;-webkit-user-drag:none;transform-origin:50% 50%;will-change:transform}
+.photo-viewer-img.zoom-anim{transition:transform .16s ease}
+.photo-viewer-img.zoomed{cursor:grab}
+.photo-viewer-img.panning{cursor:grabbing}
+.photo-viewer:fullscreen .photo-viewer-img{max-width:100vw;max-height:100vh}
+.viewer-zoom[hidden]{display:none!important}
+
+/* Photo viewer: no blue text/image selection tint when clicking Next/Prev quickly,
+   and fullscreen shows the photo corner to corner. */
+.photo-viewer,.photo-viewer *{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+.photo-viewer *::selection{background:transparent;color:inherit}
+.photo-viewer img,.photo-viewer video{-webkit-user-drag:none;outline:0}
+.photo-viewer:fullscreen{background:#000}
+.photo-viewer:fullscreen .photo-viewer-img,
+.photo-viewer:fullscreen .photo-viewer-video{width:100vw;height:100vh;max-width:none;max-height:none;object-fit:contain;border-radius:0}

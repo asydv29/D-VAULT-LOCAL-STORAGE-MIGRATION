@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script>(function(d){try{var ua=navigator.userAgent,im=/ mobile/i.test(ua),K="dpWasMobile";if(im){localStorage.setItem(K,"1");return}if(localStorage.getItem(K)!=="1")return;var m=d.querySelector('meta[name="viewport"]');if(!m){m=d.createElement("meta");m.setAttribute("name","viewport");d.head.appendChild(m)}m.setAttribute("content","width=1280")}catch(e){}})(document);</script>
+<meta name="theme-color" content="#0f0f0f">
+<title>Watch — D Vault</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/style.css">
+<script src="/perf.js" async></script><script src="/local-storage.js"></script><script src="/local-preview.js"></script><script src="/local-api.js"></script><script src="/local-bootstrap.js"></script><script src="/local-progress.js"></script>
+</head>
+<body class="watch-page home-page">
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar"></aside>
+<!-- GlobalSidebar renders the drawer markup itself; watch.js below owns
+     toggle/liked/account/folders/playlists behavior on this page, so we
+     only use sidebar.js here for the shared markup + active-page highlight. -->
+<script>window.DP_SIDEBAR_SKIP=['toggle','liked','account','folders','playlists'];</script>
+<script src="/sidebar.js"></script>
+<div class="modal" id="modal">
+  <div class="modal-card">
+    <button class="modal-close" id="modalClose">×</button>
+    <h2 id="modalTitle">D Vault</h2>
+    <p id="modalText"></p>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+<header class="topbar" id="watchTopbar">
+<button class="icon-btn menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+<a class="brand" href="/" id="watchBrand"><svg class="brand-play-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M6 4.7c0-1.28 1.4-2.06 2.5-1.4l11.2 6.3a1.6 1.6 0 0 1 0 2.8L8.5 18.7c-1.1.66-2.5-.12-2.5-1.4V4.7Z"></path></svg><span>D Vault</span></a>
+<form class="watch-search-form" id="watchSearchForm" role="search">
+<button type="button" class="watch-search-back" id="watchSearchBack" aria-label="Close search"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg></button>
+<input type="text" class="watch-search-input" id="watchSearchInput" autocomplete="off" placeholder="Search" aria-label="Search videos">
+<button type="submit" class="watch-search-submit" aria-label="Submit search"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
+</form>
+<div class="top-actions"><button type="button" class="icon-btn" id="watchSearchBtn" aria-label="Search"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button></div>
+</header>
+<main class="watch-layout">
+<section class="watch-main">
+<div class="player" id="player">
+<video id="video" playsinline preload="auto" fetchpriority="high"></video>
+<div class="player-topbar" id="playerTopbar">
+<div class="player-topbar-left">
+<button type="button" class="topbar-icon-btn pip-collapse-btn" id="pipCollapseBtn" aria-label="Minimize to picture-in-picture"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></button>
+</div>
+<div class="player-topbar-actions">
+<button type="button" class="topbar-icon-btn" id="moreCastBtn" hidden aria-label="Cast"><span class="sr-only">Cast</span><span class="topbar-icon-svg" id="moreCastIcon"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7"></path><path d="M2 12a9 9 0 0 1 8 8"></path><path d="M2 16a5 5 0 0 1 4 4"></path><line x1="2" y1="20" x2="2.01" y2="20"></line></svg></span></button>
+<button type="button" class="topbar-icon-btn" id="moreBtn" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19.14,12.94c0.04,-0.31 0.06,-0.62 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z"></path></svg></button>
+</div>
+</div>
+<div class="center-play" id="centerPlay"><svg viewBox="0 0 24 24" width="46" height="46" fill="#fff" style="margin-left:5px"><path d="M8 5v14l11-7z"></path></svg></div><div class="center-flash" id="centerFlash"></div><div class="gesture-hint" id="gestureHint"></div><div class="speed-badge" id="speedBadge"><span class="speed-badge-icon">▶▶</span><span id="speedBadgeText">2x</span></div><div class="ts-status" id="tsStatus" hidden></div>
+<div class="skip-indicator skip-indicator-left" id="skipLeft"><span class="skip-indicator-icon">◁◁</span><span class="skip-indicator-text" id="skipLeftText">10 seconds</span></div>
+<div class="skip-indicator skip-indicator-right" id="skipRight"><span class="skip-indicator-icon">▷▷</span><span class="skip-indicator-text" id="skipRightText">10 seconds</span></div>
+<button type="button" class="screenshot-btn" id="screenshotBtn" aria-label="Take a screenshot of this frame"><img src="/icons/screenshot-icon.png" width="26" height="26" alt=""></button>
+<div class="player-loading" id="playerLoading"><div class="spinner-ring"></div></div>
+<div class="shortcuts-panel" id="shortcutsPanel" hidden>
+<div class="shortcuts-card">
+<button class="shortcuts-close" id="shortcutsClose" aria-label="Close shortcuts">✕</button>
+<h2>Keyboard shortcuts</h2>
+<ul>
+<li><span class="key">Space / K</span><span>Play / pause</span></li>
+<li><span class="key">← / →</span><span>Back / forward 5s</span></li>
+<li><span class="key">J / L</span><span>Back / forward 10s</span></li>
+<li><span class="key">↑ / ↓</span><span>Volume up / down</span></li>
+<li><span class="key">M</span><span>Mute / unmute</span></li>
+<li><span class="key">F</span><span>Fullscreen</span></li>
+<li><span class="key">I</span><span>Picture-in-picture</span></li>
+<li><span class="key">0–9</span><span>Jump to 0%–90%</span></li>
+<li><span class="key">Home / End</span><span>Jump to start / end</span></li>
+<li><span class="key">, / .</span><span>Step one frame (paused)</span></li>
+<li><span class="key">&lt; / &gt;</span><span>Slower / faster speed</span></li>
+<li><span class="key">?</span><span>Toggle this panel</span></li>
+</ul>
+</div>
+</div>
+<div class="controls" id="controls">
+<div class="seek-area" id="seekArea"><div class="preview" id="preview"><canvas id="previewCanvas" width="192" height="108"></canvas><div id="previewTime">0:00</div></div><div class="timeline" id="timeline"><div class="buffered" id="buffered"></div><div class="played" id="played"></div><div class="scrubber" id="scrubber"></div></div></div>
+<div class="control-row"><button class="control-btn" id="playBtn" aria-label="Play"><svg viewBox="0 0 24 24" width="20" height="20" fill="#fff" style="margin-left:2px"><path d="M8 5v14l11-7z"></path></svg></button><span class="time" id="time">0:00 / 0:00</span><div class="control-spacer"></div><button class="control-btn volume-btn" id="muteBtn" aria-label="Mute"><span class="volume-icon" id="volumeIcon"></span></button><div class="volume-area" id="volumeArea"><div class="volume-track" id="volumeTrack"><div class="volume-fill" id="volumeFill"></div><div class="volume-thumb" id="volumeThumb"></div></div></div><button class="control-btn" id="fitBtn" aria-label="Zoom to fill">Fill</button><button class="control-btn fullscreen-btn" id="fullscreenBtn" aria-label="Fullscreen"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg></button></div>
+<div class="quality-menu" id="qualityMenu">
+  <button data-quality="auto">Auto</button>
+  <button data-quality="original" class="active">Original</button>
+  <button data-quality="1080">1080p</button>
+  <button data-quality="720">720p</button>
+  <button data-quality="480">480p</button>
+  <button data-quality="360">360p</button>
+  <button data-quality="240">240p</button>
+  <div class="quality-status" id="qualityStatus" hidden></div>
+  <div class="quality-note">Auto and Original play the local source directly. Other resolutions are optional device-side conversions.</div>
+</div>
+<div class="more-menu" id="moreMenu">
+  <div class="more-menu-panel" id="moreMenuMain">
+    <button type="button" class="more-menu-item quality-item" id="qualityBtn" aria-label="Video quality">Original</button>
+    <button type="button" class="more-menu-item" id="moreSpeedBtn"><span>Playback speed</span><span class="more-menu-value" id="moreSpeedValue">Normal</span></button>
+    <button type="button" class="more-menu-item" id="moreShortcutsBtn"><span>Keyboard shortcuts</span><span class="more-menu-icon more-menu-icon-svg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><line x1="6" y1="9" x2="6" y2="9"/><line x1="9.5" y1="9" x2="9.5" y2="9"/><line x1="13" y1="9" x2="13" y2="9"/><line x1="16.5" y1="9" x2="16.5" y2="9"/><line x1="6" y1="12.5" x2="6" y2="12.5"/><line x1="9.5" y1="12.5" x2="9.5" y2="12.5"/><line x1="13" y1="12.5" x2="13" y2="12.5"/><line x1="16.5" y1="12.5" x2="16.5" y2="12.5"/><line x1="8" y1="16" x2="16" y2="16"/></svg></span></button>
+    <button type="button" class="more-menu-item" id="morePipBtn"><span>Picture in picture</span><span class="more-menu-icon more-menu-icon-svg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h5"/><rect x="13" y="13" width="8" height="6" rx="1.5"/></svg></span></button>
+    <button type="button" class="more-menu-item" id="moreShortBtn"><span id="moreShortLabel">Mark as Short</span><img id="moreShortIcon" src="/icons/mark-as-shorts.svg" alt="" class="more-menu-icon shorts-menu-icon"></button>
+    <button type="button" class="more-menu-item" id="moreDetailsBtn"><span>Details</span><span class="more-menu-icon more-menu-icon-svg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg></span></button>
+  </div>
+  <div class="more-menu-panel more-menu-speed hidden" id="moreMenuSpeed">
+    <button type="button" class="more-menu-back" id="moreSpeedBack">‹ Playback speed</button>
+    <button data-speed=".5">0.5×</button>
+    <button data-speed=".75">0.75×</button>
+    <button data-speed="1">Normal</button>
+    <button data-speed="1.25">1.25×</button>
+    <button data-speed="1.5">1.5×</button>
+    <button data-speed="1.75">1.75×</button>
+    <button data-speed="2">2×</button>
+    <button data-speed="2.5">2.5×</button>
+    <button data-speed="3">3×</button>
+  </div>
+</div>
+</div></div>
+<h1 id="title" class="skel-text">Loading…</h1><div class="video-meta" id="videoMeta"><span id="metaText"></span></div>
+<div class="actions"><button id="like" class="action-btn"><span class="like-icon-wrap"><svg class="like-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="like-label">Like</span></button><button id="downloadBtn" class="action-btn"><img src="/icons/download.png" alt="" class="action-icon"> Download</button><button id="changeThumbnailBtn" class="action-btn"><img src="/icons/thumbnail-icon.png" alt="" class="action-icon icon-plain"> Thumbnail</button><input id="watchThumbnailInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden><div class="actions-more-wrap"><button type="button" id="actionsMoreBtn" class="action-btn actions-more-trigger" aria-haspopup="true" aria-expanded="false"><span class="actions-more-dots" aria-hidden="true">•••</span><span>More</span></button><div class="actions-more-menu" id="actionsMoreMenu"><button id="playlistBtn" class="more-menu-item"><span class="more-menu-icon"><img src="/icons/playlist-icon.png" alt="" class="action-icon"></span><span class="more-menu-label">Add to playlist</span></button><button id="fav" class="more-menu-item"><span class="more-menu-icon"><span class="fav-icon-wrap"><svg class="fav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg></span></span><span class="fav-label more-menu-label">Save to Watch Later</span></button><button id="favStar" class="more-menu-item"><span class="more-menu-icon"><span class="fav-icon-wrap"><svg class="fav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg></span></span><span class="fav-star-label more-menu-label">Add to favorites</span></button><button id="renameBtn" class="more-menu-item"><span class="more-menu-icon"><svg class="more-menu-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span><span class="more-menu-label">Rename</span></button><button id="downloadInAppBtn" class="more-menu-item"><span class="more-menu-icon"><svg class="more-menu-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="more-menu-label">Download offline</span></button><button id="cancelDownloadInAppBtn" class="more-menu-item" hidden><span class="more-menu-icon">✕</span><span class="more-menu-label">Cancel download</span></button><button id="detailsBtn" class="more-menu-item"><span class="more-menu-icon"><svg class="more-menu-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg></span><span class="more-menu-label">Details</span></button><button id="shareBtn" class="more-menu-item"><span class="more-menu-icon"><svg class="more-menu-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span><span class="more-menu-label">Share</span></button><button id="deleteBtn" class="more-menu-item danger"><span class="more-menu-icon"><img src="/icons/delete-icon.png" alt="" class="action-icon icon-plain"></span><span class="more-menu-label">Delete</span></button></div></div></div>
+</section>
+<div class="rec-refresh-slot" id="recRefreshSlot"></div>
+<aside class="recommendations"><div class="rec-divider" aria-hidden="true"></div><div id="upNextList" class="up-next-list">
+  <div class="rec-skel"></div><div class="rec-skel"></div><div class="rec-skel"></div>
+</div></aside>
+</main>
+<section class="related-section">
+  <div class="rec-head"><h2 class="related-title"></h2><button type="button" id="recRefreshBtn" class="rec-refresh-btn" aria-label="Refresh recommendations"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"></path></svg></button></div>
+  <div id="recommendationList" class="recommendation-list">
+    <div class="rec-skel"></div><div class="rec-skel"></div><div class="rec-skel"></div><div class="rec-skel"></div><div class="rec-skel"></div><div class="rec-skel"></div><div class="rec-skel"></div><div class="rec-skel"></div>
+  </div>
+  <div id="recSentinel" class="rec-sentinel" aria-hidden="true"></div>
+</section>
+<script src="/offline.js"></script><script src="/autothumb.js"></script><script src="/idb-store.js"></script><script src="/idb-downloads.js"></script><script src="/offline-player.js"></script><script src="/preview.js"></script><script src="/details.js"></script><script src="/watch.js"></script>
+<script>
+(function(){
+  // Meta row beneath the title: quality badge + type + size + duration +
+  // upload date — all from data already on hand (the video element's own
+  // metadata, plus vinfo handed off by watch.js), no new network requests.
+  var video=document.getElementById('video'),metaText=document.getElementById('metaText');
+  if(video&&metaText){
+    var vinfoData=window.__vinfo||null;
+    var fmtDur=function(s){
+      if(!isFinite(s)||s<0)return'';
+      s=Math.floor(s);
+      var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+      return (h?h+':'+String(m).padStart(2,'0'):String(m))+':'+String(sec).padStart(2,'0');
+    };
+    var fmtSize=function(bytes){
+      if(!isFinite(bytes)||bytes<0)return'';
+      var units=['B','KB','MB','GB','TB'],i=0,n=bytes;
+      while(n>=1024&&i<units.length-1){n/=1024;i++}
+      return (i===0?n:n.toFixed(n<10?1:0))+' '+units[i];
+    };
+    var fmtDate=function(iso){
+      if(!iso)return'';
+      var d=new Date(iso);
+      if(isNaN(d.getTime()))return'';
+      return d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+    };
+    var fmtType=function(name){
+      var m=/\.([a-z0-9]+)$/i.exec(String(name||''));
+      return m?m[1].toUpperCase():'';
+    };
+    // Same rule as the video cards (server) — short side, or the 16:9
+    // equivalent of the long side — so a 1080x1920 portrait clip reads 1080p
+    // here too instead of "2K".
+    var qualityLabel=function(w,h){
+      if(!w||!h)return'';
+      var e=Math.max(Math.min(w,h),Math.round(Math.max(w,h)*9/16));
+      if(e>=2000)return'4K';
+      if(e>=1300)return'2K';
+      if(e>=1000)return'1080p';
+      if(e>=680)return'720p';
+      if(e>=460)return'480p';
+      if(e>=340)return'360p';
+      return e+'p';
+    };
+    var render=function(){
+      metaText.innerHTML='';
+      var q=qualityLabel(video.videoWidth,video.videoHeight);
+      if(q){
+        var badge=document.createElement('span');
+        badge.className='meta-quality-badge';
+        badge.textContent=q;
+        metaText.appendChild(badge);
+      }
+      var parts=[
+        fmtType(vinfoData&&(vinfoData.title||vinfoData.name)),
+        vinfoData?fmtSize(vinfoData.size):'',
+        fmtDur(video.duration),
+        vinfoData?fmtDate(vinfoData.createdTime):''
+      ].filter(Boolean);
+      parts.forEach(function(p){
+        if(metaText.childNodes.length){
+          var dot=document.createElement('span');
+          dot.className='meta-dot';
+          dot.textContent='•';
+          metaText.appendChild(dot);
+        }
+        var span=document.createElement('span');
+        span.textContent=p;
+        metaText.appendChild(span);
+      });
+    };
+    document.addEventListener('dp:vinfo',function(e){vinfoData=e.detail;render()});
+    video.addEventListener('loadedmetadata',render);
+  }
+  // Chevron (v) button, top-left: pop the video into Picture-in-Picture.
+  //
+  // Bug fix: this used to navigate away (back, or home) a moment after PiP
+  // engaged — the idea being "float the video, then go browse elsewhere".
+  // But Picture-in-Picture is tied to *this* document: navigating the same
+  // tab to a different page (history.back() / location.href, both full
+  // page loads on this multi-page site) unloads the watch page, and an
+  // unloaded document can't keep its PiP window open — so the float
+  // animation played, the page navigated, and the video simply vanished
+  // instead of continuing to float. This is what showed up as "PiP mode
+  // not working". Real PiP already does what the navigate-away was trying
+  // to simulate (it keeps floating over whatever you do next — switch
+  // apps, go to the home screen, etc.) as long as we leave this tab alone,
+  // so we no longer navigate on success. We still go "back" when there's
+  // no PiP to fall back on, since there's nothing to lose there.
+  var pipCollapseBtn=document.getElementById('pipCollapseBtn'),pipVideo=document.getElementById('video');
+  if(pipCollapseBtn&&pipVideo){
+    pipCollapseBtn.addEventListener('click',function(e){
+      e.stopPropagation();
+      pipCollapseBtn.classList.remove('tap');
+      void pipCollapseBtn.offsetWidth; // restart the tap animation on repeated clicks
+      pipCollapseBtn.classList.add('tap');
+      var leave=function(){
+        if(document.referrer&&new URL(document.referrer).origin===location.origin)history.back();
+        else location.href='/';
+      };
+      var pipSupported='pictureInPictureElement' in document&&!pipVideo.disablePictureInPicture;
+      if(!pipSupported){
+        // No PiP API at all on this browser — nothing to float, so this
+        // button can only act as "go back".
+        leave();
+        return;
+      }
+      (document.pictureInPictureElement?Promise.resolve():pipVideo.requestPictureInPicture())
+        .catch(function(err){
+          console.error('Picture-in-picture failed:',err);
+          // Stay on the page either way — going "back" here would just
+          // lose the video with no PiP window to show for it.
+        });
+    });
+  }
+  // Keep Picture-in-Picture alive across "Back" and the Home link.
+  //
+  // The chevron above no longer navigates on success, so PiP itself works
+  // fine — but the *next* thing people naturally do is hit the browser's
+  // Back button, or tap Home in the sidebar, to go browse something else
+  // while the video floats. Both of those are full page navigations on
+  // this multi-page site, which — same as the old bug above — unload this
+  // document and take the PiP window down with it.
+  //
+  // Fix: once PiP is active, intercept just those two exits and show the
+  // home page inside a full-screen iframe layered on top of this page,
+  // instead of actually leaving it. This document (and the floating video
+  // it owns) stays alive underneath the whole time. Picking an actual
+  // video from that iframe still does a real, top-level navigation — see
+  // the target="_top" on video links in app.js — which ends PiP exactly
+  // like opening a new video normally would.
+  if(pipVideo){
+    var pipHomeOverlay=null,pipGuarded=false;
+    var pipIsActive=function(){return document.pictureInPictureElement===pipVideo};
+    var showPipHome=function(){
+      if(pipHomeOverlay)return;
+      pipHomeOverlay=document.createElement('iframe');
+      pipHomeOverlay.src='/';
+      pipHomeOverlay.setAttribute('aria-label','D Vault home');
+      pipHomeOverlay.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:999999;background:#0f0f0f';
+      document.body.appendChild(pipHomeOverlay);
+    };
+    pipVideo.addEventListener('enterpictureinpicture',function(){
+      // Arm a same-document history entry so the *first* Back press is
+      // ours to catch (it never unloads this document — pushState never
+      // does) instead of immediately navigating to the previous page.
+      if(pipGuarded)return;
+      pipGuarded=true;
+      try{history.pushState({pipGuard:true},'',location.href)}catch(_){}
+    });
+    pipVideo.addEventListener('leavepictureinpicture',function(){pipGuarded=false});
+    window.addEventListener('popstate',function(){
+      if(pipIsActive()&&!pipHomeOverlay){
+        showPipHome();
+        // Cosmetic: reflect "/" in the address bar without adding another
+        // history entry, so a second Back press falls through to whatever
+        // real page came before this one (ending PiP then, as expected).
+        try{history.replaceState({pipHome:true},'','/')}catch(_){}
+      }
+    });
+    document.addEventListener('click',function(e){
+      if(!pipIsActive())return;
+      var a=e.target.closest('a[href="/"],[data-nav="home"]');
+      if(!a)return;
+      e.preventDefault();
+      showPipHome();
+      try{history.replaceState({pipHome:true},'','/')}catch(_){}
+    },true);
+  }
+  // Toggle the "More" popup in the action bar (Playlist / Save / Rename /
+  // Download offline / Share / Details / Delete live inside it) — always a
+  // fixed bottom sheet (see the matching CSS), so no positioning math needed.
+  var moreBtn=document.getElementById('actionsMoreBtn'),moreMenu=document.getElementById('actionsMoreMenu');
+  if(moreBtn&&moreMenu){
+    var closeMenu=function(){
+      moreMenu.classList.remove('show');
+      moreBtn.setAttribute('aria-expanded','false');
+    };
+    moreBtn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var open=moreMenu.classList.toggle('show');
+      moreBtn.setAttribute('aria-expanded',open?'true':'false');
+    });
+    moreMenu.addEventListener('click',function(e){
+      if(e.target.closest('button'))closeMenu();
+    });
+    document.addEventListener('click',function(e){
+      if(!moreMenu.contains(e.target)&&e.target!==moreBtn)closeMenu();
+    });
+  }
+  // Share: the native share sheet where available, otherwise copy the link
+  // and flash the row's own label instead of reaching for a toast element
+  // this script doesn't own.
+  var shareBtn=document.getElementById('shareBtn');
+  if(shareBtn){
+    shareBtn.addEventListener('click',function(){
+      var url=location.href,title=document.title;
+      if(navigator.share){
+        navigator.share({title:title,url:url}).catch(function(){});
+        return;
+      }
+      var label=shareBtn.querySelector('.more-menu-label');
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(function(){
+          if(!label)return;
+          var was=label.textContent;
+          label.textContent='Link copied!';
+          setTimeout(function(){label.textContent=was},1400);
+        }).catch(function(){});
+      }
+    });
+  }
+})();
+</script>
+</body></html>

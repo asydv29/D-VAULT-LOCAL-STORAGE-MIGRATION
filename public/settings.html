@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D Vault — Storage</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/style.css">
+<script src="/local-storage.js"></script><script src="/local-preview.js"></script><script src="/local-api.js"></script>
+<style>
+body{background:#0f0f0f;color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.dv-settings{max-width:720px;margin:0 auto;padding:28px 18px 60px}
+.dv-top{display:flex;align-items:center;gap:14px;margin-bottom:28px}.dv-top a{color:#fff;text-decoration:none;font-size:22px}.dv-top h1{margin:0;font-size:24px}
+.dv-card{background:#151515;border:1px solid #2a2a2a;border-radius:16px;padding:20px;margin:14px 0}.dv-card h2{font-size:17px;margin:0 0 8px}.muted{color:#aaa;line-height:1.5;font-size:14px}.path{margin:14px 0;padding:13px;border-radius:10px;background:#0c0c0c;color:#ddd;word-break:break-all}
+button{border:0;border-radius:10px;background:#fff;color:#111;padding:12px 16px;font-weight:700;cursor:pointer;margin:6px 6px 0 0}button.secondary{background:#292929;color:#fff}button:disabled{opacity:.55}
+#status{min-height:22px;color:#aaa;margin-top:10px;font-size:13px}.error{color:#ff9f9f!important}
+</style></head>
+<body><main class="dv-settings">
+<div class="dv-top"><a href="/" aria-label="Back">←</a><h1>D Vault Storage</h1></div>
+<div class="dv-card"><h2>Current Storage</h2><div id="path" class="path">Checking…</div><p class="muted">D Vault reads media directly from the folder you explicitly select. Files are not uploaded to a server.</p>
+<button id="change">Change Storage Folder</button><button id="scan" class="secondary">Refresh Library</button><div id="status"></div></div>
+<div class="dv-card"><h2>Local-first</h2><p class="muted">Thumbnails, timeline sprites, favorites, watch history, watch progress and metadata are stored locally. Browser permissions are controlled by your operating system.</p></div>
+</main>
+<script>
+(async()=>{
+ const path=document.getElementById('path'),status=document.getElementById('status');
+ async function show(){const a=await DVaultStorage.getActive();path.textContent=a?a.name:'No storage folder selected';}
+ async function scan(){status.className='';status.textContent='Scanning local media…';try{await DVaultAPI.scan();status.textContent='Library refreshed.';await show()}catch(e){status.textContent=e.message||'Unable to scan storage.';status.className='error'}}
+ document.getElementById('change').onclick=async()=>{status.className='';status.textContent='Requesting permission…';try{await DVaultStorage.selectFolder();await scan();location.href='/'}catch(e){status.textContent=e.message||'Unable to access this folder.';status.className='error'}};
+ document.getElementById('scan').onclick=scan; await show();
+})();
+</script></body></html>

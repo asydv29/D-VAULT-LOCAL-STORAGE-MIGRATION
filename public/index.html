@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script>(function(d){try{var ua=navigator.userAgent,im=/ mobile/i.test(ua),K="dpWasMobile";if(im){localStorage.setItem(K,"1");return}if(localStorage.getItem(K)!=="1")return;var m=d.querySelector('meta[name="viewport"]');if(!m){m=d.createElement("meta");m.setAttribute("name","viewport");d.head.appendChild(m)}m.setAttribute("content","width=1280")}catch(e){}})(document);</script>
+<meta name="theme-color" content="#0f0f0f">
+<title>D Vault</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/style.css">
+<script src="/perf.js" defer></script><script src="/local-storage.js"></script><script src="/local-preview.js"></script><script src="/local-api.js"></script><script src="/local-bootstrap.js"></script><script src="/local-progress.js"></script>
+</head>
+<body class="home-page">
+<header class="home-topbar">
+  <button class="icon-btn menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+  <a class="home-brand" href="/" aria-label="D Vault home">
+    <img class="brand-logo" src="/d-vault-logo.svg" alt="D Vault">
+  </a>
+
+  <form class="home-search" id="searchForm">
+    <input id="search" autocomplete="off" placeholder="Search" aria-label="Search videos">
+  </form>
+
+  <div class="topbar-icons">
+    <button type="button" class="icon-btn topbar-search-btn" id="searchToggleBtn" aria-label="Search" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    </button>
+    <button class="avatar" id="avatarBtn" type="button" aria-label="Account">
+      <span class="avatar-initial" id="avatarInitial">A</span>
+    </button>
+    <button class="create-btn home-hidden-action" id="createBtn" type="button">＋ Create</button>
+    <button class="icon-btn home-hidden-action" id="bellBtn" aria-label="Notifications">♧</button>
+  </div>
+</header>
+
+<div class="home-layout">
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <!-- GlobalSidebar renders the drawer markup itself; app.js below owns
+       toggle/liked/active/account/folders/playlists behavior on this page
+       (it already implements the richer merge-aware folder tree), so we
+       only use sidebar.js here for the shared markup. -->
+  <script>window.DP_SIDEBAR_SKIP=['toggle','liked','active','account','folders','playlists'];</script>
+  <script src="/sidebar.js"></script>
+
+  <main class="home-content">
+    <section class="home-section">
+      <div id="folderHeader" class="folder-header" hidden>
+        <h1 id="folderHeaderTitle"></h1>
+        <a class="folder-clear" href="/">✕ Clear</a>
+      </div>
+      <div id="playlistHeader" class="folder-header" hidden>
+        <h1 id="playlistHeaderTitle"></h1>
+        <div class="playlist-header-actions">
+          <button class="folder-clear" id="playlistRenameBtn" type="button">✎ Rename</button>
+          <button class="folder-clear" id="playlistDeleteBtn" type="button">🗑 Delete</button>
+          <a class="folder-clear" href="/">✕ Clear</a>
+        </div>
+      </div>
+      <div class="select-line" id="selectLine">
+        <div class="filter-tabs" id="filterTabs">
+          <button type="button" class="filter-tab" data-filter="all">All</button>
+          <button type="button" class="filter-tab" data-filter="videos">Videos</button>
+          <button type="button" class="filter-tab" data-filter="shorts">Shorts</button>
+          <button type="button" class="filter-tab" data-filter="photos">Photos</button>
+        </div>
+        <script>
+          // All/Videos/Shorts/Photos belong on the plain Home feed and on
+          // the Liked view (liked spans videos/Shorts/photos too, so the
+          // same filters make sense there) - hide them everywhere else
+          // (folder, playlist, history, favorites, watch later, etc).
+          // Runs inline so there's no flash of the tabs before app.js loads.
+          (function(){var q=new URLSearchParams(location.search);
+            if(q.get('folder')||q.get('playlist')||q.get('view')||(q.get('list')&&q.get('list')!=='liked'))
+              {document.getElementById('filterTabs').style.display='none';document.getElementById('selectLine').classList.add('no-tabs');}})();
+        </script>
+        <div id="selectBar" class="select-bar"></div>
+      </div>
+      <div id="grid" class="video-grid"></div>
+    </section>
+  </main>
+</div>
+
+<input id="thumbnailInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal">
+  <div class="modal-card">
+    <button class="modal-close" id="modalClose">×</button>
+    <h2 id="modalTitle">D Vault</h2>
+    <p id="modalText"></p>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+<nav class="home-bottom-nav" id="homeBottomNav" aria-label="Primary">
+  <a class="home-bnav-item" href="/" data-bnav="home">
+    <span class="home-bnav-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3 10.5V21a1 1 0 0 0 1 1h5.5a.75.75 0 0 0 .75-.75V15.5a1.75 1.75 0 0 1 3.5 0v5.75c0 .414.336.75.75.75H20a1 1 0 0 0 1-1V10.5L12 3.2Z"/></svg></span>
+    <span>Home</span>
+  </a>
+  <a class="home-bnav-item" href="/shorts.html">
+    <span class="home-bnav-icon"><img src="/icons/shorts-icon.png" alt="" class="shorts-nav-icon"></span>
+    <span>Shorts</span>
+  </a>
+  <a class="home-bnav-item" href="/?view=history" data-bnav="history">
+    <span class="home-bnav-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 1 0 8.94 10h-2.02A7 7 0 1 1 13 5c1.66 0 3.14.63 4.28 1.66L14 10h7V3l-2.35 2.35A8.98 8.98 0 0 0 13 3Z"/><path d="M12 8v5l4 2-.75 1.3L11 13.5V8Z"/></svg></span>
+    <span>History</span>
+  </a>
+  <button class="home-bnav-item" id="bnavProfileBtn" type="button">
+    <span class="home-bnav-avatar" id="bnavAvatar">A</span>
+    <span>You</span>
+  </button>
+</nav>
+<script src="/offline.js"></script>
+
+<script src="/idb-store.js"></script>
+<script src="/idb-downloads.js"></script>
+<script src="/autothumb.js"></script>
+<script src="/orientationdetect.js"></script>
+<script src="/preview.js"></script>
+<script src="/details.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,295 @@
+/* ================= MyTube Shorts full-screen player ================= */
+*{box-sizing:border-box}
+html,.shorts-page{height:100%;overscroll-behavior:none}
+.shorts-page{
+  margin:0;background:#000;color:#fff;
+  font-family:Arial,Helvetica,sans-serif;
+  overflow:hidden;
+  height:100dvh;width:100vw;
+  -webkit-user-select:none;user-select:none;
+}
+button{font:inherit}
+a{color:inherit}
+
+/* ---- Feed: one full-screen video per snap slide ---- */
+.shorts-feed{
+  height:100dvh;width:100vw;
+  overflow-y:scroll;
+  scroll-snap-type:y mandatory;
+  scrollbar-width:none;-ms-overflow-style:none;
+  background:#000;
+}
+.shorts-feed::-webkit-scrollbar{display:none}
+
+/* ---- Auto-hide UI while a Short is playing ----
+   Only the mute button and the three-dot menu stay on screen the whole
+   time; everything else (the "Shorts" label, search icon, Like/Download/
+   Favorite, the title/stats block and the progress bar) fades out a
+   couple of seconds into playback and instantly reappears on pause or tap. */
+.short-topbar-title,
+.short-search-btn,
+.short-like-btn,
+.short-download-btn,
+.short-fav-btn,
+.short-screenshot-btn,
+.short-bottom-info{
+  opacity:1;
+  transition:opacity .25s ease;
+}
+.short-slide.ui-hidden .short-topbar-title,
+.short-slide.ui-hidden .short-search-btn,
+.short-slide.ui-hidden .short-like-btn,
+.short-slide.ui-hidden .short-download-btn,
+.short-slide.ui-hidden .short-fav-btn,
+.short-slide.ui-hidden .short-screenshot-btn,
+.short-slide.ui-hidden .short-bottom-info{
+  opacity:0;
+  pointer-events:none;
+}
+/* The progress/scrubber bar stays visible and interactive at all times,
+   even once the rest of the UI has faded out during playback. */
+.short-progress{
+  opacity:1;
+  transition:opacity .25s ease;
+}
+/* The gradient behind the top bar fades with it so it doesn't sit there
+   darkening the video once the icons underneath it are gone. */
+.short-slide.ui-hidden .shorts-topbar{background:transparent;transition:background .25s ease}
+
+/* On mouse/trackpad, hovering the slide should bring the faded UI straight
+   back (like YouTube's desktop player) instead of requiring a click, since
+   a click there also toggles play/pause. Touch devices have no hover, so
+   this only applies where a real pointer is present. */
+@media (hover:hover) and (pointer:fine){
+  .short-slide.ui-hidden:hover .short-topbar-title,
+  .short-slide.ui-hidden:hover .short-search-btn,
+  .short-slide.ui-hidden:hover .short-like-btn,
+  .short-slide.ui-hidden:hover .short-download-btn,
+  .short-slide.ui-hidden:hover .short-fav-btn,
+  .short-slide.ui-hidden:hover .short-screenshot-btn,
+  .short-slide.ui-hidden:hover .short-bottom-info{
+    opacity:1;
+    pointer-events:auto;
+  }
+  .short-slide.ui-hidden:hover .shorts-topbar{
+    background:linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,0));
+  }
+}
+
+.short-slide{
+  position:relative;
+  height:100dvh;width:100vw;
+  scroll-snap-align:start;
+  scroll-snap-stop:always;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;background:#000;
+}
+.short-video{
+  width:100%;height:100%;
+  object-fit:cover;
+  background:#000;
+  display:block;
+}
+.short-tap-layer{position:absolute;inset:0;z-index:3;background:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:pan-y}
+
+/* Center play/pause icon — shown ONLY while paused, auto-hidden the moment
+   the video is playing (this mirrors the watch page's .center-play). */
+.short-center-icon{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:76px;height:76px;border-radius:50%;
+  background:rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;color:#fff;line-height:1;
+  z-index:4;pointer-events:none;
+  transition:opacity .15s ease;
+}
+.short-center-icon.hidden{opacity:0}
+
+/* Double-tap seek (-10s / +10s) flash */
+.short-seek-flash{
+  position:absolute;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  color:#fff;font-size:13px;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,.8);
+  opacity:0;pointer-events:none;transition:opacity .15s ease;z-index:6;
+}
+.short-seek-flash.show{opacity:1}
+.short-seek-flash.left{left:14%}
+.short-seek-flash.right{right:14%}
+.short-seek-icon{font-size:26px;line-height:1}
+
+/* Press-and-hold 2x speed flash */
+.short-speed-flash{
+  position:absolute;top:14%;left:50%;transform:translate(-50%,0);
+  background:rgba(0,0,0,.6);color:#fff;padding:7px 16px;border-radius:20px;
+  font-size:14px;font-weight:700;letter-spacing:.02em;
+  opacity:0;pointer-events:none;transition:opacity .15s ease;z-index:6;
+}
+.short-speed-flash.show{opacity:1}
+
+.short-spinner-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none}
+.short-spinner-wrap.hidden{display:none}
+.short-mini-spinner{width:38px;height:38px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;animation:shortsSpin .8s linear infinite}
+@keyframes shortsSpin{to{transform:rotate(360deg)}}
+
+/* ---- Top bar ---- */
+.shorts-topbar{
+  position:absolute;top:0;left:0;right:0;z-index:5;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(env(safe-area-inset-top,0px) + 14px) calc(env(safe-area-inset-right,0px) + 2px) 30px 10px;
+  background:linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,0));
+}
+.shorts-topbar-title{font-size:22px;font-weight:700;letter-spacing:.2px}
+.shorts-topbar-actions{display:flex;align-items:center;gap:2px;margin-left:auto;margin-right:-10px}
+.shorts-icon-btn{
+  width:42px;height:42px;border-radius:50%;border:0;background:transparent;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  color:#fff;
+}
+.shorts-icon-btn:active{background:rgba(255,255,255,.18)}
+.shorts-icon-btn img{width:22px;height:22px;object-fit:contain}
+.shorts-icon-btn svg.shorts-icon-svg{width:22px;height:22px}
+.shorts-icon-btn.is-muted .short-icon-volume{display:none}
+.shorts-icon-btn .short-icon-mute{display:none}
+.shorts-icon-btn.is-muted .short-icon-mute{display:block}
+.shorts-icon-invert{filter:invert(1)}
+.shorts-dots-btn{font-size:22px;font-weight:900;color:#fff;line-height:1}
+
+/* ---- Right action rail ---- */
+.short-rail{
+  position:absolute;right:6px;bottom:118px;z-index:5;
+  display:flex;flex-direction:column;align-items:center;gap:22px;
+}
+.short-rail-btn{
+  background:transparent;border:0;color:#fff;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  text-shadow:0 1px 3px rgba(0,0,0,.7);
+}
+.short-rail-icon{width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+.short-rail-icon img{width:28px;height:28px;object-fit:contain}
+.short-rail-icon .short-like-svg{width:27px;height:27px}
+.short-rail-count{font-size:12px;font-weight:600}
+.short-like-btn.liked .short-rail-icon .short-like-svg{fill:#FF0000;stroke:#FF0000}
+.short-fav-btn.faved .short-fav-star{color:#ffd23f}
+.short-download-btn.is-saved{cursor:default}
+.short-download-btn.is-saved .short-rail-icon{font-size:26px;color:#3ea6ff}
+.short-fav-star,.short-avatar-badge{font-size:27px;line-height:1}
+.short-screenshot-icon{font-size:24px;line-height:1}
+.short-screenshot-mid{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);z-index:5;
+}
+
+/* ---- Bottom caption / meta ---- */
+.short-bottom-info{
+  position:absolute;left:14px;right:78px;bottom:80px;z-index:4;
+  text-shadow:0 1px 4px rgba(0,0,0,.8);
+}
+.short-channel-row{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.short-channel-avatar{
+  width:30px;height:30px;border-radius:50%;background:#444;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none;
+}
+.short-channel-name{font-weight:700;font-size:14px}
+.short-title{margin:0 0 6px;font-size:14.5px;line-height:1.35;font-weight:400;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.short-stats{margin:0;font-size:12.5px;color:#e6e6e6}
+
+/* ---- Bottom progress bar (sits just above the fixed nav) ---- */
+.short-progress{position:absolute;left:0;right:0;bottom:14px;height:14px;z-index:4;
+  display:flex;align-items:flex-end;cursor:pointer;touch-action:none;}
+.short-progress-track{position:relative;width:100%;height:3px;background:rgba(255,255,255,.22);
+  transition:height .12s ease,background-color .12s ease;}
+.short-progress.dragging .short-progress-track,
+.short-progress:active .short-progress-track{height:5px}
+.short-progress-fill{height:100%;width:0%;background:rgba(255,255,255,.7);position:relative;transition:background-color .12s ease}
+/* While dragging: track and fill switch from light/translucent to solid colours */
+.short-progress.dragging .short-progress-track,
+.short-progress:active .short-progress-track{background:#6b6b6b}
+.short-progress.dragging .short-progress-fill,
+.short-progress:active .short-progress-fill{background:#fff}
+.short-progress-thumb{position:absolute;top:50%;right:0;width:11px;height:11px;border-radius:50%;
+  background:#fff;transform:translate(50%,-50%) scale(0);transition:transform .12s ease;
+  box-shadow:0 0 2px rgba(0,0,0,.4)}
+.short-progress.dragging .short-progress-thumb,
+.short-progress:active .short-progress-thumb{transform:translate(50%,-50%) scale(1)}
+
+/* ---- Empty / loading states ---- */
+.shorts-empty,.shorts-loading{
+  position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;text-align:center;padding:0 30px;z-index:10;background:#000;
+}
+.shorts-loading.hidden,.shorts-empty[hidden]{display:none}
+.shorts-empty-icon{font-size:44px;color:#aaa}
+.shorts-empty h2{margin:6px 0 0}
+.shorts-empty p{color:#aaa;margin:0 0 10px}
+.shorts-empty-btn{background:#272727;color:#fff;text-decoration:none;padding:10px 18px;border-radius:20px}
+.shorts-spinner{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;animation:shortsSpin .8s linear infinite}
+
+/* ---- Three-dot "more" menu: bottom sheet ---- */
+.shorts-menu-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:29}
+.shorts-more-menu{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:#212121;border-radius:16px 16px 0 0;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  max-width:480px;margin:0 auto;
+  box-shadow:0 -6px 30px rgba(0,0,0,.5);
+}
+.shorts-more-panel{padding:6px 0}
+.shorts-more-panel.hidden{display:none}
+.shorts-more-item{
+  display:flex;align-items:center;justify-content:space-between;width:100%;
+  background:transparent;border:0;color:#fff;padding:16px 20px;font-size:15px;text-align:left;cursor:pointer;
+}
+.shorts-more-item:active{background:#2f2f2f}
+.shorts-more-value{color:#aaa;font-size:13px}
+.shorts-more-icon{color:#aaa;font-size:15px;display:flex;align-items:center}
+.shorts-more-icon svg{width:19px;height:19px}
+.shorts-more-back{
+  display:block;width:100%;text-align:left;padding:16px 20px;background:transparent;
+  border:0;border-bottom:1px solid #333;color:#3ea6ff;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:4px;
+}
+.shorts-more-sub button[data-speed],.shorts-more-sub button[data-quality]{
+  display:block;width:100%;text-align:left;padding:14px 20px;background:transparent;border:0;color:#fff;font-size:15px;cursor:pointer;
+}
+.shorts-more-sub button[data-speed]:active,.shorts-more-sub button[data-quality]:active{background:#2f2f2f}
+.shorts-more-sub button.active{color:#3ea6ff;font-weight:700}
+.shorts-quality-status{padding:10px 20px;color:#aaa;font-size:12.5px}
+/* Details sub-panel: label / value rows, scrolls if the sheet gets tall. */
+.shorts-details-body{max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 0 6px}
+.shorts-details-row{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;padding:11px 20px;border-bottom:1px solid #2c2c2c}
+.shorts-details-row:last-child{border-bottom:0}
+.shorts-details-key{flex:0 0 auto;color:#aaa;font-size:13px;padding-top:1px}
+.shorts-details-val{flex:1 1 auto;min-width:0;text-align:right;color:#fff;font-size:14px;word-break:break-word;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
+
+/* ---- Toast ---- */
+.shorts-toast{
+  position:fixed;left:50%;bottom:76px;transform:translate(-50%,20px);opacity:0;
+  background:#fff;color:#111;padding:11px 18px;border-radius:8px;z-index:100;transition:.2s;
+  font-size:13.5px;max-width:80vw;text-align:center;
+}
+.shorts-toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(min-width:820px){
+  .shorts-feed{max-width:520px;margin:0 auto}
+  .short-slide{max-width:520px;margin:0 auto}
+  .shorts-page{background:#000}
+}
+.offline-banner{position:fixed;top:0;left:0;right:0;z-index:80;background:#3a2f10;color:#ffd77a;font-size:12px;text-align:center;padding:8px 12px}
+.offline-banner[hidden]{display:none}
+
+/* Hamburger menu button — floats over the full-bleed feed since shorts.html
+   has no topbar of its own. Reuses .icon-btn/.menu-btn from style.css for
+   the actual hamburger icon, just repositioned + restyled to sit on top of
+   video content. */
+
+.shorts-menu-btn:hover{background:rgba(0,0,0,.5)}
+
+/* ---- Scrub preview popup: centered thumbnail + big "current / total" time ---- */
+.short-preview{position:absolute;left:50%;bottom:16%;transform:translateX(-50%) scale(.94);
+  z-index:5;display:flex;flex-direction:column;align-items:center;gap:10px;
+  opacity:0;pointer-events:none;transition:opacity .12s ease,transform .12s ease;text-align:center}
+.short-preview.show{opacity:1;transform:translateX(-50%) scale(1)}
+.short-preview-canvas{display:none;width:104px;height:168px;aspect-ratio:5/8;object-fit:cover;background:#000;
+  border:2px solid rgba(255,255,255,.9);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.45)}
+.short-preview-time{font-size:22px;font-weight:600;letter-spacing:.5px;color:rgba(255,255,255,.75);
+  font-variant-numeric:tabular-nums;text-shadow:0 1px 6px rgba(0,0,0,.6);white-space:nowrap}
