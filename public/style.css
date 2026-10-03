@@ -2568,3 +2568,5 @@ html body #likedToggle:focus-visible{
 
 /* D Vault: no profile/account avatar in any title bar. */
 .yt-topbar .avatar,.home-topbar .avatar,.topbar-icons .avatar{display:none!important}
+
+.watch-page .topbar-icon-btn.active{background:#ffffff33}

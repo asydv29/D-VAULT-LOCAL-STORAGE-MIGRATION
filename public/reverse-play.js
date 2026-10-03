@@ -13,7 +13,7 @@
    - Stops at the start, or when the user plays/pauses, or when the source changes. */
 (function(){
   const states=new WeakMap();
-  const START_EPS=.25,MAX_SIDE=640;
+  const START_EPS=.25,MAX_SIDE=540;
   const FAST=typeof HTMLVideoElement!=='undefined'&&'requestVideoFrameCallback' in HTMLVideoElement.prototype&&typeof createImageBitmap==='function';
   const isActive=v=>!!v&&states.has(v);
   // Reverse mode is "on" until the user turns it off; inside it, play/pause only pauses/resumes the reverse.
@@ -40,6 +40,7 @@
     let alive=true,frames=[],decoding=false,bufLow=Infinity,T=o.fromEnd?Math.max(0,dur-.05):v.currentTime,nextEnd=T,raf=0,cv=null,ctx=null,drawn=null;
     let t0=0,lastSync=0,tickN=0,W=0,H=0,fails=0,boxW=-1,boxH=-1,metaTimer=0;
     st.T=T;
+    let gen=0,curFinish=null,lastSetVal=T;
     const closeAll=a=>a.forEach(f=>{try{f.bmp.close()}catch(_){}});
     st.cleanup=reason=>{
       alive=false;cancelAnimationFrame(raf);clearTimeout(metaTimer);
@@ -52,15 +53,20 @@
     };
     const rate=()=>Math.max(.1,Number(o.rate||v.playbackRate)||1);
     const gap=()=>Math.max(.03,rate()/30-.005);
+    // How much decoded video to keep ahead of the reverse playhead, and how long each decoded chunk is (media seconds).
+    const ahead=()=>o.ahead||Math.max(1,rate())*3.5+.3;
+    const segLen=()=>o.segLen||Math.max(2,rate()*2);
     const decodeSeg=(a,b)=>{
       decoding=true;
       return new Promise(res=>{
-        const got=[],pending=[];let done=false,lastMt=-1,guard=0;
+        const got=[],pending=[],g=gen;let done=false,lastMt=-1,guard=0;
         const finish=async()=>{
           if(done)return;done=true;clearTimeout(guard);
+          if(curFinish===finish)curFinish=null;
           try{dv.pause()}catch(_){}
           await Promise.all(pending);
-          if(!alive){closeAll(got);decoding=false;res();return}
+          // Discarded: the player closed, or the user jumped elsewhere while this chunk was decoding.
+          if(!alive||g!==gen){closeAll(got);decoding=false;res();return}
           if(got.length){fails=0;frames=frames.concat(got).sort((x,y)=>x.t-y.t);bufLow=a;nextEnd=a}
           else if(++fails>=2){decoding=false;res();fallback();return}
           decoding=false;res();
@@ -79,10 +85,11 @@
         const onSeeked=()=>{
           dv.removeEventListener('seeked',onSeeked);
           if(done||!alive)return;
-          dv.playbackRate=o.decodeRate||Math.min(8,Math.max(2,rate()*2));
+          dv.playbackRate=o.decodeRate||Math.min(8,Math.max(4,rate()*3));
           dv.requestVideoFrameCallback(onFrame);
           dv.play().catch(finish);
         };
+        curFinish=finish;
         dv.addEventListener('seeked',onSeeked);
         dv.addEventListener('ended',finish,{once:true});
         guard=setTimeout(finish,((b-a)/2+5)*1000);
@@ -110,6 +117,16 @@
     let last=performance.now();
     const tick=now=>{
       if(!alive||states.get(v)!==st)return;
+      // The user jumped on the timeline (progress bar, skip, keys...): re-anchor the reverse there.
+      if(!o.noSync&&!v.seeking&&Math.abs(v.currentTime-lastSetVal)>.3){
+        gen++;T=v.currentTime;lastSetVal=T;st.T=T;
+        closeAll(frames);frames=[];drawn=null;bufLow=Infinity;nextEnd=T;
+        if(cv){cv.remove();cv=null} // show the real video at the new spot until new frames are ready
+        if(curFinish)curFinish();
+      }else if(!o.noSync&&v.seeking&&Math.abs(v.currentTime-lastSetVal)>.3){
+        // seek still in flight: wait for it to land before re-anchoring
+        last=now;raf=requestAnimationFrame(tick);return;
+      }
       const dt=st.paused?0:Math.min(.1,Math.max(0,(now-last)/1000));last=now;
       // Advance the reverse clock only through media that is already decoded.
       if(bufLow<Infinity){
@@ -125,13 +142,13 @@
         if(f!==drawn&&f.t<=T+.05)showFrame(f);
         while(frames.length>i+2){const x=frames.pop();try{x.bmp.close()}catch(_){}}
       }
-      if(!decoding&&nextEnd>.001&&(nextEnd-T)<Math.max(1,rate())*1.5+.3){
-        const len=bufLow===Infinity?.6*Math.max(1,rate()):Math.max(1,rate());
+      if(!decoding&&nextEnd>.001&&(nextEnd-T)<ahead()){
+        const len=bufLow===Infinity?Math.min(segLen(),.8*Math.max(1,rate())):segLen();
         decodeSeg(Math.max(0,nextEnd-len),nextEnd);
       }
       if(cv&&!o.host&&(++tickN%12===0||boxW!==v.offsetWidth||boxH!==v.offsetHeight))syncBox();
       // Keep the real player's playhead / progress bar roughly in step.
-      if(!o.noSync&&now-lastSync>400&&!v.seeking){lastSync=now;try{v.currentTime=Math.max(0,T)}catch(_){}}
+      if(!o.noSync&&now-lastSync>1000&&!v.seeking){lastSync=now;lastSetVal=Math.max(0,T);try{v.currentTime=lastSetVal}catch(_){}}
       raf=requestAnimationFrame(tick);
     };
     dv.addEventListener('error',()=>{if(alive)fallback()},{once:true});
@@ -210,7 +227,7 @@
     const dur=v.duration;
     if(!dur||!isFinite(dur))return false;
     if(isActive(v))stop(v,true);
-    const st={onStop:o.onEnd,opts:{host,rate:o.rate||3,decodeRate:4,noSync:true,maxSide:480,maxSeconds:o.maxSeconds,onTick:o.onProgress,fromEnd:true}};
+    const st={onStop:o.onEnd,opts:{host,rate:o.rate||3,decodeRate:6,ahead:10,segLen:6,noSync:true,maxSide:480,maxSeconds:o.maxSeconds,onTick:o.onProgress,fromEnd:true}};
     states.set(v,st);
     runFast(v,st,dur,()=>{if(states.get(v)!==st)return;stop(v,true);try{o.onFail&&o.onFail()}catch(_){}});
     return true;

@@ -1841,14 +1841,14 @@ async function main(){
  moreMenuSpeed?.querySelectorAll("button[data-speed]").forEach(b=>b.onclick=e=>{e.stopPropagation();sets(+b.dataset.speed)});
  // Reverse play: plays backwards from the current spot (or from the end if the
  // video is at the very start). Tapping it again, or play/pause, stops it.
- const moreReverseBtn=$("#moreReverseBtn"),moreReverseValue=$("#moreReverseValue");
- const syncReverseUi=()=>{if(moreReverseValue)moreReverseValue.textContent=window.DVReverse?.isActive(v)?"On":"Off";ui()};
- if(moreReverseBtn)moreReverseBtn.onclick=e=>{
+ const reverseBtn=$("#reverseBtn");
+ const syncReverseUi=()=>{reverseBtn?.classList.toggle("active",!!window.DVReverse?.isActive(v));ui()};
+ if(reverseBtn)reverseBtn.onclick=e=>{
    e.stopPropagation();
    if(!window.DVReverse)return;
    if(DVReverse.isActive(v)){DVReverse.stop(v)}
    else{allowAutoplay=true;if(!DVReverse.start(v,syncReverseUi))show("Video is not ready yet")}
-   closeMoreMenu();syncReverseUi();
+   syncReverseUi();
  };
  if(moreShortcutsBtn)moreShortcutsBtn.onclick=e=>{e.stopPropagation();closeMoreMenu();toggleShortcuts(true)};
  if(morePipBtn)morePipBtn.onclick=e=>{e.stopPropagation();closeMoreMenu();togglePip()};

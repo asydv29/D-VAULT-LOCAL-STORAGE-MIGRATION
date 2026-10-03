@@ -110,6 +110,7 @@ function slideHTML(v,i){
     <div class="shorts-topbar">
       <span class="shorts-topbar-title">Shorts</span>
       <div class="shorts-topbar-actions">
+        <button class="shorts-icon-btn short-reverse-btn" aria-label="Reverse play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="shorts-icon-svg"><path d="M9.6 8.6 16.3 12 9.6 15.4Z"></path><path d="M4.3 15.3A8.4 8.4 0 0 1 17 5.1"></path><path d="M15.2 6.1 17.6 5.6 17.2 3.2"></path><path d="M19.7 8.7A8.4 8.4 0 0 1 7 18.9"></path><path d="M8.8 17.9 6.4 18.4 6.8 20.8"></path></svg></button>
         <button class="shorts-icon-btn short-mute-btn${muted?" is-muted":""}" aria-label="Mute">
           <img class="short-icon-volume shorts-icon-invert" src="/icons/volume.png" alt="">
           <img class="short-icon-mute" src="/icons/mute.png" alt="">
@@ -526,6 +527,7 @@ function wireSlide(slide){
   progressBar.addEventListener("pointercancel",endDrag);
   progressBar.addEventListener("click",e=>e.stopPropagation());
 
+  slide.querySelector(".short-reverse-btn").onclick=e=>{e.stopPropagation();toggleShortReverse(slide)};
   slide.querySelector(".short-mute-btn").onclick=e=>{
     e.stopPropagation();
     muted=!muted;
@@ -699,16 +701,14 @@ function openMoreMenu(slide){
 function closeMoreMenu(){moreMenu.hidden=true;menuBackdrop.hidden=true}
 menuBackdrop.onclick=closeMoreMenu;
 speedBtn.onclick=()=>showPanel(speedPanel);
-// Reverse play: from the current spot, or from the end if the Short is at its very start.
-$("#shortsReverseBtn").onclick=()=>{
-  const slide=currentMenuSlide||feed.children[activeIndex];
+// Reverse play (top-bar button): from the current spot, or from the end if the Short is at its very start.
+function toggleShortReverse(slide){
   const v=slide&&slide.querySelector("video");
-  closeMoreMenu();
   if(!v)return;
   if(window.DVReverse?.isActive(v)){DVReverse.stop(v);updateCenterIcon(slide,v);return}
   const ok=window.DVReverse?.start(v,()=>updateCenterIcon(slide,v));
   if(ok)updateCenterIcon(slide,v);else toast("Short is not ready yet");
-};
+}
 qualityBtn.onclick=()=>showPanel(qualityPanel);
 
 // ---- Details: everything known about the Short's file, gathered from the
