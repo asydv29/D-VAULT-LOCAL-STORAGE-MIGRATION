@@ -164,7 +164,7 @@ let photosSearchTimer=0;$('#photosSearch').oninput=()=>{clearTimeout(photosSearc
 
 // Title-bar account button: mirrors the "You" entry point on the other
 // pages (sign-in check with a quick toast, or bounce to login).
-$('#avatarBtn').onclick=async()=>{const a=await window.DVaultStorage.getActive();show(a?'Storage: '+a.name:'No storage folder selected')};
+if($('#avatarBtn'))$('#avatarBtn').onclick=async()=>{const a=await window.DVaultStorage.getActive();show(a?'Storage: '+a.name:'No storage folder selected')};
 
 // ---- Instant photo swaps ----
 // A full-size original can be several MB, and it used to start downloading

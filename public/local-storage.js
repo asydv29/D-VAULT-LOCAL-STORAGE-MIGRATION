@@ -150,10 +150,12 @@
       const bin=atob(raw.base64||"");const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
       return new File([u],raw.name||record.name||"file",{type:raw.mimeType||record.mimeType||"application/octet-stream",lastModified:Number(raw.lastModified||record.lastModified)||Date.now()});
     }
-    let cur=await ensurePermission();
+    const active=await ensurePermission();
+    if(!active||!active.handle)throw new Error("Storage folder is not selected.");
+    let dir=active.handle;
     const parts=String(record.relativePath||"").split("/").filter(Boolean);
-    for(let i=0;i<parts.length-1;i++)cur=await cur.handle.getDirectoryHandle(parts[i]);
-    return cur.handle.getFileHandle(parts[parts.length-1]).then(h=>h.getFile());
+    for(let i=0;i<parts.length-1;i++)dir=await dir.getDirectoryHandle(parts[i]);
+    return dir.getFileHandle(parts[parts.length-1]).then(h=>h.getFile());
   }
 
   async function fileHandleFor(record){

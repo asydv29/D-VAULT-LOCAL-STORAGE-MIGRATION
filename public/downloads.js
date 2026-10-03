@@ -262,7 +262,7 @@ document.addEventListener("click",async e=>{
 })();
 
 // Title-bar account button: same quick sign-in check used elsewhere.
-$("#avatarBtn").onclick=async()=>{
+if($("#avatarBtn"))$("#avatarBtn").onclick=async()=>{
   try{
     const r=await fetch("/api/me",{credentials:"include"});
     if(!r.ok)throw Error("storage unavailable");

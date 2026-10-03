@@ -74,10 +74,6 @@
       <span class="side-icon fav-icon side-fav-icon"></span>
       <span>Favorites</span>
     </a>
-    <a class="side-item" href="/downloads.html" data-nav="downloads">
-      <span class="side-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a1 1 0 0 1 1 1v9.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V4a1 1 0 0 1 1-1Z"/><path d="M5 19a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1Z"/></svg></span>
-      <span>Downloads</span>
-    </a>
     <button class="side-item" data-view="history" data-nav="history">
       <span class="side-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 1 0 8.94 10h-2.02A7 7 0 1 1 13 5c1.66 0 3.14.63 4.28 1.66L14 10h7V3l-2.35 2.35A8.98 8.98 0 0 0 13 3Z"/><path d="M12 8v5l4 2-.75 1.3L11 13.5V8Z"/></svg></span>
       <span>History</span>

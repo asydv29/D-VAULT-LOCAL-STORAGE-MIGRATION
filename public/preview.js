@@ -8,6 +8,7 @@
     if(active?.vid===vid)active=null;
     card.classList.remove('previewing','loading');
     const bar=card.querySelector('.thumb-loadbar');if(bar){bar.style.width='0';bar.style.transition='none';bar.classList.remove('from-right')}
+    card.querySelectorAll('.thumb-rev-canvas').forEach(c=>c.remove());
     vid.pause();vid.removeAttribute('src');vid.load();
   }
   // Progress line = only the part already watched. Driven by the real playhead
@@ -50,6 +51,51 @@
     p.catch(()=>blobCache.delete(url));
     if(blobCache.size>8){const k=blobCache.keys().next().value;blobCache.get(k).then(u=>URL.revokeObjectURL(u),()=>{});blobCache.delete(k)}
     return p;
+  }
+  // ---- Reverse (right->left swipe) preview ----
+  // Seeking a real <video> backwards frame by frame is what made reverse lag:
+  // every seek re-decodes from the previous keyframe. The scrub sprite sheet
+  // already holds frames spread over the whole video, so reverse is drawn from
+  // it on a canvas: no decoding, no seeking, no big download.
+  const spriteCache=new Map();
+  async function getSprite(id){
+    if(spriteCache.has(id))return spriteCache.get(id);
+    const P=window.DVaultPreview,S=window.DVaultStorage;if(!P||!S)return null;
+    const [r,a]=await Promise.all([S.get('meta',id),P.asset(id,'sprite')]);
+    if(!r||!r.sprite||!a||!a.blob)return null;
+    const bmp=await createImageBitmap(a.blob);
+    const e={bmp,m:r.sprite,vw:Number(r.width)||0,vh:Number(r.height)||0};
+    spriteCache.set(id,e);
+    if(spriteCache.size>12){const k=spriteCache.keys().next().value,o=spriteCache.get(k);spriteCache.delete(k);try{o.bmp.close()}catch(_){}}
+    return e;
+  }
+  function playSpriteReverse(vid,card,sp,onEnd){
+    const m=sp.m,n=Math.max(1,Number(m.frameCount)||1),fw=Number(m.frameWidth)||160,fh=Number(m.frameHeight)||90,cols=Number(m.columns)||10;
+    const box=card.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);
+    const W=Math.max(2,Math.round(box.width*dpr)),H=Math.max(2,Math.round(box.height*dpr));
+    const cv=document.createElement('canvas');cv.className='thumb-rev-canvas';cv.width=W;cv.height=H;
+    cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;background:#000';
+    card.appendChild(cv);
+    const ctx=cv.getContext('2d',{alpha:false});
+    // The cell is letterboxed to the real video shape; crop that, then cover-fit the card.
+    const vw=sp.vw||fw,vh=sp.vh||fh,sc=Math.min(fw/vw,fh/vh),cw=Math.max(1,vw*sc),ch=Math.max(1,vh*sc);
+    const ar=W/H;let kw=cw,kh=ch;if(cw/ch>ar)kw=ch*ar;else kh=cw/ar;
+    const T=Math.min(5,Math.max(2.5,n*.1))*1000,t0=performance.now();let last=-1,raf=0;
+    const bar=card.querySelector('.thumb-loadbar');
+    const finish=()=>{cancelAnimationFrame(raf);stop(vid,card)};
+    active={vid,card,stop:finish};
+    card.classList.add('previewing');
+    if(bar){bar.classList.add('from-right');bar.style.transition='none'}
+    const tick=now=>{
+      if(active?.vid!==vid||!cv.isConnected)return;
+      const p=Math.min(1,(now-t0)/T),i=Math.max(0,n-1-Math.floor(p*n));
+      if(i!==last){last=i;const sx=(i%cols)*fw+(fw-cw)/2+(cw-kw)/2,sy=Math.floor(i/cols)*fh+(fh-ch)/2+(ch-kh)/2;
+        try{ctx.drawImage(sp.bmp,sx,sy,kw,kh,0,0,W,H)}catch(_){}}
+      if(bar)bar.style.width=(p*100).toFixed(2)+'%';
+      if(p>=1){finish();return}
+      raf=requestAnimationFrame(tick);
+    };
+    raf=requestAnimationFrame(tick);
   }
   function wire(){
     const hover=matchMedia('(hover:hover) and (pointer:fine)').matches;
@@ -110,15 +156,23 @@
           }catch{}};
           if(!reverse)attach(vid.dataset.src,begin);
           else{
+            const lid=vid.dataset.localId;
             const seekFallback=async()=>{
-              if(window.DVaultMedia&&vid.dataset.localId){
-                try{await attach(await DVaultMedia.url(vid.dataset.localId),begin);return}catch{}
+              if(window.DVaultMedia&&lid){
+                try{await attach(await DVaultMedia.url(lid),begin);return}catch{}
               }
               if(!vid.dataset.src)return;
               getBlobSrc(vid.dataset.src).then(u=>attach(u,begin),()=>attach(vid.dataset.src,begin));
             };
-            if(revUrl&&!revFailed.has(revUrl)){
-              // Pre-reversed clip: plays forward = smooth. Line grows from the right.
+            if(lid&&window.DVaultPreview&&DVaultPreview.asset){
+              getSprite(lid).then(sp=>{
+                if(my!==gid)return;
+                if(sp){done=true;playSpriteReverse(vid,card,sp);return}
+                // No sprite yet: build it now (the next swipe is instant) and use the seek loop this once.
+                try{DVaultPreview.prioritizeSprite&&DVaultPreview.prioritizeSprite(lid,0)}catch(_){}
+                seekFallback();
+              },()=>seekFallback());
+            }else if(revUrl&&!revFailed.has(revUrl)){
               getBlobSrc(revUrl).then(u=>{
                 if(my!==gid)return;
                 attach(u,()=>{if(done||my!==gid)return;done=true;start(vid,card,0,true)});

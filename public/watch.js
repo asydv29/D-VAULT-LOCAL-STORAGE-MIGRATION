@@ -2080,7 +2080,6 @@ async function main(){
          <button type="button" data-rec-playlist="${esc(x.id)}"><img src="/icons/playlist-icon.png" alt="" class="menu-icon icon-invert"> Save to playlist</button>
          <button type="button" data-rec-thumb="${esc(x.id)}"><img src="/icons/thumbnail-icon.png" alt="" class="menu-icon"> Change thumbnail</button>
          <button type="button" data-rec-rename="${esc(x.id)}">✏️ Rename</button>
-         <button type="button" data-rec-download="${esc(x.id)}">📲 Download offline</button>
          <button type="button" data-rec-savefile="${esc(x.id)}"><img src="/icons/download.png" alt="" class="menu-icon icon-invert"> Download</button>
          <button type="button" data-rec-short="${esc(x.id)}">${x.isShort?'<img src="/icons/remove-from-shorts.svg" alt="" class="menu-icon"> Remove from Shorts':'<img src="/icons/mark-as-shorts.svg" alt="" class="menu-icon"> Mark as Short'}</button>
          <button type="button" data-rec-details="${esc(x.id)}">${window.DPDetails?window.DPDetails.icon:""} Details</button>
@@ -2204,7 +2203,6 @@ async function main(){
          <button type="button" data-rec-playlist="${esc(x.id)}"><img src="/icons/playlist-icon.png" alt="" class="menu-icon icon-invert"> Save to playlist</button>
          <button type="button" data-rec-thumb="${esc(x.id)}"><img src="/icons/thumbnail-icon.png" alt="" class="menu-icon"> Change thumbnail</button>
          <button type="button" data-rec-rename="${esc(x.id)}">✏️ Rename</button>
-         <button type="button" data-rec-download="${esc(x.id)}">📲 Download offline</button>
          <button type="button" data-rec-savefile="${esc(x.id)}"><img src="/icons/download.png" alt="" class="menu-icon icon-invert"> Download</button>
          <button type="button" data-rec-short="${esc(x.id)}">${x.isShort?'<img src="/icons/remove-from-shorts.svg" alt="" class="menu-icon"> Remove from Shorts':'<img src="/icons/mark-as-shorts.svg" alt="" class="menu-icon"> Mark as Short'}</button>
          <button type="button" data-rec-details="${esc(x.id)}">${window.DPDetails?window.DPDetails.icon:""} Details</button>

@@ -82,7 +82,12 @@
     if(kind==="sprite")return d<300?30:d<900?45:d<1800?60:d<3600?90:120;
     return d<600?30:d<1200?40:d<2400?50:60;
   }
-  async function ensureSprite(id,force=false){
+  const spriteInflight=new Map();
+  function ensureSprite(id,force=false){
+    const k=id+(force?":f":"");if(spriteInflight.has(k))return spriteInflight.get(k);
+    const p=buildSprite(id,force).finally(()=>spriteInflight.delete(k));spriteInflight.set(k,p);return p;
+  }
+  async function buildSprite(id,force=false){
     const r=await recordFor(id);if(!r)return null;
     const existing=await meta().get("assets",id+":sprite:"+VERSION);
     if(existing&&!force)return r.sprite||{ready:true};
@@ -132,14 +137,21 @@
     if(playbackActive)return;
     while(running<concurrency()&&queue.length&&!playbackActive){
       const j=queue.shift();running++;
-      (async()=>{try{await ensureThumbnail(j.id);if(!playbackActive)await ensureSprite(j.id)}catch{}finally{running--;pump()}})()
+      (async()=>{try{
+        // Sprite-first jobs (someone is about to scrub this video) build the
+        // timeline sheet before the poster so it is ready as early as possible.
+        if(j.sprite){await ensureSprite(j.id);await ensureThumbnail(j.id)}
+        else{await ensureThumbnail(j.id);if(!playbackActive)await ensureSprite(j.id)}
+      }catch{}finally{running--;pump()}})()
     }
   }
   function setPlaybackActive(v){playbackActive=!!v;if(!playbackActive)pump()}
 
-  function enqueue(id,priority=10){const existing=queue.find(x=>x.id===id);if(existing){if(priority<existing.priority)existing.priority=priority;queue.sort((a,b)=>a.priority-b.priority);pump();return}queue.push({id,priority});queue.sort((a,b)=>a.priority-b.priority);pump()}
+  function enqueue(id,priority=10,opts){const existing=queue.find(x=>x.id===id);if(existing){if(opts?.sprite)existing.sprite=true;if(priority<existing.priority)existing.priority=priority;queue.sort((a,b)=>a.priority-b.priority);pump();return}queue.push({id,priority,sprite:!!opts?.sprite});queue.sort((a,b)=>a.priority-b.priority);pump()}
   function prioritize(id){enqueue(id,0)}
-  window.DVaultPreview={VERSION,ensureThumbnail,ensureSprite,ensureHover,enqueue,prioritize,frameCount,setPlaybackActive,
+  // Shorts: build the scrub sprite for this video now (and neighbours, lower priority).
+  function prioritizeSprite(id,priority=0){enqueue(id,priority,{sprite:true})}
+  window.DVaultPreview={VERSION,ensureThumbnail,ensureSprite,ensureHover,enqueue,prioritize,prioritizeSprite,frameCount,setPlaybackActive,
     async asset(id,type){return meta().get("assets",id+":"+type+":"+VERSION)},
     async invalidate(id){for(const k of ["thumbnail","sprite"])await meta().del("assets",id+":"+k+":"+VERSION).catch(()=>{});const r=await recordFor(id);if(r){r.thumbnail=null;r.sprite=null;await saveMeta(r)}}
   };

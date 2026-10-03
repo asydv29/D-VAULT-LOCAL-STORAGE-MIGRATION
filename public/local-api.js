@@ -176,7 +176,7 @@
   }
   async function metadataResponse(id){
     const r=await getRec(id);if(!r)return err("Video not found",404);
-    if(P&&!(await S.get("assets",id+":sprite:"+P.VERSION)))P.enqueue(id,8);
+    if(P&&!(await S.get("assets",id+":sprite:"+P.VERSION)))P.prioritizeSprite?P.prioritizeSprite(id,0):P.enqueue(id,8);
     const s=r.sprite||null; if(s)return json(s);
     const a=await S.get("assets",id+":sprite:"+(P?.VERSION||2));
     return a?json(r.sprite||{ready:true,frameCount:60,frameWidth:160,frameHeight:90,columns:10,intervalSeconds:(r.duration||600)/60,version:P?.VERSION||2}):err("Preview not ready",404);

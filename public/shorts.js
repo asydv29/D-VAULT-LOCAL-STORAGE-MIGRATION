@@ -207,6 +207,9 @@ function activateSlide(i,slideEl){
   }
   activeIndex=i;
   ensureLoaded(i);
+  // Build the scrub-preview sprite for this Short and the next two right away
+  // instead of waiting for the slow background queue.
+  if(window.DVaultPreview?.prioritizeSprite){for(let k=0;k<3;k++){const it=items[i+k];if(it&&it.id&&!String(it.id).startsWith("picker:"))DVaultPreview.prioritizeSprite(String(it.id),k)}}
   const v=slideEl.querySelector("video");
   v.muted=muted;
   v.playbackRate=speed;
@@ -441,7 +444,7 @@ function wireSlide(slide){
         const im=new Image();im.decoding="async";const asset=window.DVaultPreview&&await DVaultPreview.asset(decodeURIComponent(id),"sprite");if(asset?.blob)im.src=URL.createObjectURL(asset.blob);else im.src="/api/previews/"+id+"/sprite";
         await new Promise((res,rej)=>{im.onload=res;im.onerror=rej});
         spriteMeta=mr;spriteImg=im;return true;
-      }catch(_){spriteFailedAt=Date.now();return false}finally{spriteLoading=null}
+      }catch(_){spriteFailedAt=Date.now()-12000;return false}finally{spriteLoading=null}
     })();
     return spriteLoading;
   };
@@ -473,6 +476,9 @@ function wireSlide(slide){
     try{prevCtx.drawImage(v,c.x,c.y,c.w,c.h,0,0,PREV_W,PREV_H)}catch(_){}
   };
   v.addEventListener("seeked",()=>{if(progressBar.classList.contains("dragging")&&!spriteImg)drawVideoFrame()});
+  // The sprite is generated in the background; the moment it exists, drop the
+  // "failed" cool-down so the very next scrub uses it.
+  window.addEventListener("dvault:sprite-ready",e=>{if(String(e.detail?.id)===String(slide.dataset.id)){spriteFailedAt=0;spriteMeta=null;spriteImg=null}});
   function showPreview(e){
     if(!v.duration)return;
     const t=ratioFromEvent(e)*v.duration;
