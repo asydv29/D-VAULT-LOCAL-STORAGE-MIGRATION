@@ -11,7 +11,7 @@ self.addEventListener("fetch",e=>{
   if(u.origin!==location.origin||u.pathname.startsWith("/api/"))return;
   e.respondWith((async()=>{
     const c=await caches.match(r,{ignoreSearch:true});
-    const net=fetch(r).then(n=>{if(n.status===200){const copy=n.clone();caches.open(CACHE_NAME).then(x=>x.put(r,copy)).catch(()=>{})}return n});
+    const net=fetch(r,{cache:"no-cache"}).then(n=>{if(n.status===200){const copy=n.clone();caches.open(CACHE_NAME).then(x=>x.put(r,copy)).catch(()=>{})}return n});
     if(c){e.waitUntil(net.catch(()=>{}));return c}
     try{return await net}catch{return new Response("",{status:503})}
   })());

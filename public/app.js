@@ -1064,7 +1064,7 @@ $('#sidebarBackdrop').onclick=closeMenu;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{location.href='/?view='+encodeURIComponent(b.dataset.view)});
 $('#createBtn').onclick=()=>showModal('Local storage','Choose a storage folder in Settings to manage your local media.');$('#bellBtn').onclick=()=>showModal('Notifications','You have no new notifications.');
-$('#avatarBtn').onclick=async()=>{const a=await window.DVaultStorage.getActive();showModal('Storage',a?a.name:'No storage folder selected');};$('#modalClose').onclick=()=>$('#modal').classList.remove('show');$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').classList.remove('show')};function clearModalActions(){const a=$('#modalActions');if(a)a.innerHTML=''}
+{const _ab=$('#avatarBtn');if(_ab)_ab.onclick=async()=>{const a=await window.DVaultStorage.getActive();showModal('Storage',a?a.name:'No storage folder selected');};}$('#modalClose').onclick=()=>$('#modal').classList.remove('show');$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').classList.remove('show')};function clearModalActions(){const a=$('#modalActions');if(a)a.innerHTML=''}
 function showModal(t,m){$('#modalTitle').textContent=t;$('#modalText').textContent=m;clearModalActions();$('#modal').classList.add('show')}
 function showAccountModal(email){showModal('Storage',email||'Local storage');}
 document.querySelectorAll('[data-bnav]').forEach(a=>{
