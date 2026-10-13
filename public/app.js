@@ -310,6 +310,7 @@ function updateSelectBar(){
       <button data-bulk="favorite" ${n?'':'disabled'}><span class="fav-icon"></span>Favorite</button>
       <button data-bulk="like" ${n?'':'disabled'}>👍 Like</button>
       <button data-bulk="save" ${n?'':'disabled'}>⬇ Download</button>
+      <button data-bulk="refreshthumb" ${n?'':'disabled'}>🔄 Refresh thumbnail</button>
       <button data-bulk="delete" class="delete-btn" ${n?'':'disabled'}><img src="/icons/delete-icon.png" alt="" class="menu-icon"> Delete</button>
     </div>
   </div>`;
@@ -327,6 +328,22 @@ async function runBulkAction(action){
   if(action==='delete'&&!confirm(`Delete ${ids.length} video${ids.length>1?'s':''}? They will be deleted from the selected storage folder.`))return;
   if(action==='download'){await runBulkDownload(ids);return}
   if(action==='save'){await runBulkSaveToDevice(ids);return}
+  if(action==='refreshthumb'){
+    $('#selectBar').querySelectorAll('button').forEach(b=>b.disabled=true);
+    let done=0,fail=0;
+    for(const id of ids){
+      toast(`Refreshing thumbnails… ${done+fail+1}/${ids.length}`);
+      try{
+        if(window.DVaultMedia&&DVaultMedia.forgetThumb)DVaultMedia.forgetThumb(id);
+        const u=await window.DVaultPreview.ensureThumbnail(id,true);
+        if(u)done++;else fail++;
+      }catch(e){fail++}
+    }
+    toast(fail?`${done} refreshed, ${fail} failed`:`${done} thumbnail${done===1?'':'s'} refreshed`);
+    selectMode=false;selected.clear();
+    await load();
+    return;
+  }
   $('#selectBar').querySelectorAll('button').forEach(b=>b.disabled=true);
   let ok=0,fail=0;
   for(const id of ids){
@@ -1123,7 +1140,7 @@ if(playlistDeleteBtn)playlistDeleteBtn.onclick=async()=>{
 };
 document.addEventListener('click',e=>{if(!e.target.closest('.more-btn')&&!e.target.closest('.card-menu'))document.querySelectorAll('.card-menu.open').forEach(x=>x.classList.remove('open'))});
 document.addEventListener('click',e=>{if(!e.target.closest('.folder-menu-btn')&&!e.target.closest('.folder-menu'))document.querySelectorAll('.folder-menu.open').forEach(x=>x.classList.remove('open'))});
-window.addEventListener("dvault:thumbnail-ready",async e=>{const id=String(e.detail?.id||"");if(!id||!window.DVaultMedia)return;const u=await DVaultMedia.thumbnailUrl(id);if(!u)return;document.querySelectorAll('[data-watch]').forEach(a=>{if(a.dataset.watch===id){const img=a.closest(".video-card")?.querySelector(".thumb img");if(img)img.src=u}});render();});
+window.addEventListener("dvault:thumbnail-ready",async e=>{const id=String(e.detail?.id||"");if(!id||!window.DVaultMedia)return;const u=await DVaultMedia.thumbnailUrl(id);if(!u)return;document.querySelectorAll('[data-watch]').forEach(a=>{if(a.dataset.watch===id){const img=a.closest(".video-card")?.querySelector(".thumb img");if(img)img.src=u}});if(!window.__dvThumbRender)window.__dvThumbRender=setTimeout(()=>{window.__dvThumbRender=0;render()},1500);});
 window.addEventListener("dvault:sprite-ready",()=>{if(typeof load==="function")load(true)});
 load();loadFolders();loadPlaylists();refreshDownloadedIds();
 // Coming back from the Shorts player's search icon: hand focus straight to the search box.

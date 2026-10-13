@@ -43,7 +43,7 @@
       const isNew=!oldById.has(id);
       const changed=Number(previous.fileSize)!==size||Number(previous.lastModified)!==lm||previous.relativePath!==rel;
       const verStale=type==="video"&&Number(previous.previewVersion||0)!==Number(P?.VERSION||2);
-      if(!isNew&&!changed&&!verStale){seen.add(id);out.push(previous);if(type==="video"&&P&&(!previous.sprite||!previous.thumbnail))toQueue.push(id);continue}
+      if(!isNew&&!changed&&!verStale){seen.add(id);out.push(previous);if(type==="video"&&P&&(!previous.sprite||!previous.thumbnail||previous.thumbSpec!==P.THUMB_SPEC))toQueue.push(id);continue}
       const r={...previous,key:id,id,type,filename:name,title:name.replace(/\.[^.]+$/,""),relativePath:rel,path:rel,fileSize:size,size,mimeType:f.mimeType||extMime(name),lastModified:lm,folder:rel.includes("/")?rel.slice(0,rel.lastIndexOf("/")):"",native:!!f.native,url:f.url||null,token:f.token||null,fileHandle:f.fileHandle||null,createdTime:previous.createdTime||new Date(lm||Date.now()).toISOString(),views:Number(previous.views||0),liked:!!previous.liked,favorite:!!previous.favorite,watchLater:!!previous.watchLater,isShort:!!previous.isShort,watchProgress:Number(previous.watchProgress||0),previewVersion:P?.VERSION||2};
       if(type==="video"&&(changed||verStale)){r.thumbnail=null;r.sprite=null;r.previewStatus="queued";r.previewVersion=P?.VERSION||2}
       if(type==="image"){r.thumbnail="/api/photos/"+encodeURIComponent(id)+"/thumbnail";r.url="/api/photos/"+encodeURIComponent(id)+"/stream"}
@@ -250,5 +250,5 @@
     }
     return origFetch(input,init);
   };
-  window.DVaultAPI={scan,records,origFetch}; window.DVaultMedia={url:mediaUrl,thumbnailUrl};
+  window.DVaultAPI={scan,records,origFetch}; window.DVaultMedia={url:mediaUrl,thumbnailUrl,forgetThumb:id=>{const k=String(id)+':thumburl',u=mediaUrls.get(k);if(u){try{URL.revokeObjectURL(u)}catch(_){}mediaUrls.delete(k)}}};
 })();

@@ -55,24 +55,51 @@
     return meta().get("meta",id);
   }
   async function saveMeta(r){return meta().put("meta",r)}
-  async function ensureThumbnail(id,force=false){
+  const thumbInflight=new Map();
+  function ensureThumbnail(id,force=false){
+    if(thumbInflight.has(id))return thumbInflight.get(id);
+    const p=buildThumbnail(id,force).finally(()=>thumbInflight.delete(id));thumbInflight.set(id,p);return p;
+  }
+  // Fast path: sample a few well-spread frames and stop as soon as one is "good
+  // enough" (not black/blank, has detail). The result is stored once in
+  // IndexedDB and reused on every later visit - nothing is regenerated.
+  const THUMB_SECONDS=30,THUMB_SPEC='t30';
+  async function buildThumbnail(id,force=false){
     const r=await recordFor(id);if(!r)return null;
-    if(!force&&r.thumbnail&&r.previewVersion===VERSION)return r.thumbnail;
+    if(!force&&r.thumbnail&&r.previewVersion===VERSION&&r.thumbSpec===THUMB_SPEC)return r.thumbnail;
     let file=null;try{file=r.native&&r.url?r.url:await meta().fileFor(r)}catch{return null}
     const v=makeVideo(file);try{
       await waitMeta(v);r.duration=r.duration||v.duration;r.width=r.width||v.videoWidth;r.height=r.height||v.videoHeight;
-      const n=v.duration<120?8:v.duration<600?12:v.duration<1800?18:24;
-      let best=null;
-      for(const t of candidates(v.duration,n)){
-        try{const f=await frameAt(v,t);if(!best||f.score>best.score)best=f}catch{}
+      let c,best;
+      if(force){
+        // Refresh: choose a different moment than the current thumbnail. Try a few random
+        // spots (each well away from the old one) and keep the best-looking frame.
+        const d=v.duration,prev=Number(r.thumbnailTimestamp)||0,minGap=Math.min(d*.12,20),picks=[];
+        for(let i=0;i<30&&picks.length<3;i++){
+          const t=d*(.05+Math.random()*.9);
+          if(Math.abs(t-prev)>=minGap&&picks.every(x=>Math.abs(x-t)>=minGap/2))picks.push(t);
+        }
+        if(!picks.length)picks.push(clamp(prev+d*.25>d*.95?prev-d*.25:prev+d*.25,0,Math.max(0,d-.1)));
+        for(const t of picks){
+          try{const f=await frameAt(v,t,480,270);if(!best||f.score>best.score)best=f;if(best.score>=30)break}catch{}
+        }
+        if(!best)throw new Error("No suitable frame");
+        c=best.canvas;
+      }else{
+        // Default thumbnail = the frame 30 s in (one seek, no scoring); clips under a minute use their midpoint.
+        const t=clamp(v.duration>=60?THUMB_SECONDS:v.duration/2,0,Math.max(0,v.duration-.1));
+        await seek(v,t,3000);
+        if(!v.videoWidth||!v.videoHeight)throw new Error("No decodable video frame");
+        const sc=Math.min(1,480/v.videoWidth);
+        c=document.createElement("canvas");
+        c.width=Math.max(2,Math.round(v.videoWidth*sc));c.height=Math.max(2,Math.round(v.videoHeight*sc));
+        c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+        best={timestamp:t,score:0};
       }
-      if(!best)throw new Error("No suitable frame");
-      const c=document.createElement("canvas"),w=640,h=Math.max(2,Math.round(640*(best.canvas.height/best.canvas.width)));
-      c.width=w;c.height=Math.min(640,h);c.getContext("2d").drawImage(best.canvas,0,0,c.width,c.height);
-      const blob=await new Promise(res=>c.toBlob(res,"image/webp",.82));
+      const blob=await new Promise(res=>c.toBlob(res,"image/webp",.8));
       const key=id+":thumbnail:"+VERSION;await meta().put("assets",{key,type:"thumbnail",id,blob,version:VERSION});
       r.thumbnail="/api/videos/"+encodeURIComponent(id)+"/thumbnail?v="+Date.now();
-      r.thumbnailTimestamp=best.timestamp;r.thumbnailScore=best.score;r.previewVersion=VERSION;
+      r.thumbnailTimestamp=best.timestamp;r.thumbnailScore=best.score;r.previewVersion=VERSION;r.thumbSpec=THUMB_SPEC;
       await saveMeta(r);window.dispatchEvent(new CustomEvent("dvault:thumbnail-ready",{detail:{id}}));return r.thumbnail;
     }catch(e){r.previewStatus="error";await saveMeta(r).catch(()=>{});return null}
     finally{if(v.src.startsWith("blob:"))URL.revokeObjectURL(v.src);v.remove()}
@@ -133,15 +160,18 @@
     return Math.max(1,Math.min(2,Math.floor(c/2),mem>=8?2:1));
   }
   let playbackActive=false;
+  const spriteQueue=[];
   async function pump(){
     if(playbackActive)return;
-    while(running<concurrency()&&queue.length&&!playbackActive){
-      const j=queue.shift();running++;
+    while(running<concurrency()&&!playbackActive){
+      // Posters for every video come first; scrub sprites only fill idle time.
+      let j=queue.shift(),spriteOnly=false;
+      if(!j){const id=spriteQueue.shift();if(!id)break;j={id};spriteOnly=true}
+      running++;
       (async()=>{try{
-        // Sprite-first jobs (someone is about to scrub this video) build the
-        // timeline sheet before the poster so it is ready as early as possible.
-        if(j.sprite){await ensureSprite(j.id);await ensureThumbnail(j.id)}
-        else{await ensureThumbnail(j.id);if(!playbackActive)await ensureSprite(j.id)}
+        if(spriteOnly)await ensureSprite(j.id);
+        else if(j.sprite){await ensureSprite(j.id);await ensureThumbnail(j.id)}
+        else{await ensureThumbnail(j.id);if(!spriteQueue.includes(j.id))spriteQueue.push(j.id)}
       }catch{}finally{running--;pump()}})()
     }
   }
@@ -151,7 +181,7 @@
   function prioritize(id){enqueue(id,0)}
   // Shorts: build the scrub sprite for this video now (and neighbours, lower priority).
   function prioritizeSprite(id,priority=0){enqueue(id,priority,{sprite:true})}
-  window.DVaultPreview={VERSION,ensureThumbnail,ensureSprite,ensureHover,enqueue,prioritize,prioritizeSprite,frameCount,setPlaybackActive,
+  window.DVaultPreview={VERSION,THUMB_SPEC,ensureThumbnail,ensureSprite,ensureHover,enqueue,prioritize,prioritizeSprite,frameCount,setPlaybackActive,
     async asset(id,type){return meta().get("assets",id+":"+type+":"+VERSION)},
     async invalidate(id){for(const k of ["thumbnail","sprite"])await meta().del("assets",id+":"+k+":"+VERSION).catch(()=>{});const r=await recordFor(id);if(r){r.thumbnail=null;r.sprite=null;await saveMeta(r)}}
   };

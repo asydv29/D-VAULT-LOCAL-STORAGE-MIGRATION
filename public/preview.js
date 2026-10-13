@@ -8,7 +8,7 @@
   function stop(vid,card){
     if(vid._dpEnded){vid.removeEventListener('ended',vid._dpEnded);vid._dpEnded=null}
     if(active?.vid===vid)active=null;
-    card.classList.remove('previewing','loading');
+    card.classList.remove('previewing','loading','scrubbable');
     const bar=card.querySelector('.thumb-loadbar');if(bar){bar.style.width='0';bar.style.transition='none';bar.classList.remove('from-right')}
     card.querySelectorAll('.thumb-rev-canvas,.dv-reverse-canvas').forEach(c=>c.remove());
     vid.pause();vid.removeAttribute('src');vid.load();
@@ -26,6 +26,57 @@
     };
     requestAnimationFrame(tick);
   }
+  // ---- Timeline scrubber (forward hover preview only) ----
+  // A thin strip along the bottom edge of the card. Press / click / drag on it to jump the
+  // preview to that point. It only reacts inside its own strip and swallows its own events, so
+  // the card link, menu, select checkbox and the rest of the card behave exactly as before.
+  function attachScrub(vid,card){
+    let strip=card.querySelector(':scope>.thumb-scrub');
+    if(!strip){
+      strip=document.createElement('span');strip.className='thumb-scrub';strip.innerHTML='<i></i>';card.appendChild(strip);
+      const frac=e=>{const r=strip.getBoundingClientRect();return Math.min(1,Math.max(0,(e.clientX-r.left)/Math.max(1,r.width)))};
+      let drag=false,resume=false;
+      const jump=e=>{
+        const d=vid.duration;if(!d||!isFinite(d))return;
+        const t=Math.min(d-.05,frac(e)*d);
+        try{if(typeof vid.fastSeek==='function'&&drag)vid.fastSeek(t);else vid.currentTime=t}catch(_){}
+      };
+      const eat=e=>{e.stopPropagation()};
+      ['mousedown','mouseup','touchstart','touchmove','touchend','dblclick','contextmenu'].forEach(n=>strip.addEventListener(n,eat,{passive:true}));
+      strip.addEventListener('click',e=>{e.preventDefault();e.stopPropagation()});
+      strip.addEventListener('pointerdown',e=>{
+        if(active?.vid!==vid)return;
+        e.preventDefault();e.stopPropagation();drag=true;resume=!vid.paused;
+        try{strip.setPointerCapture(e.pointerId)}catch(_){}
+        strip.classList.add('dragging');clearTimeout(vid._dpPreviewTimer);vid._dpPreviewTimer=null;
+        vid.pause();jump(e);
+      });
+      strip.addEventListener('pointermove',e=>{if(!drag)return;e.preventDefault();e.stopPropagation();jump(e)});
+      const end=e=>{
+        if(!drag)return;drag=false;e.stopPropagation();strip.classList.remove('dragging');
+        try{strip.releasePointerCapture(e.pointerId)}catch(_){}
+        vid._dpScrubbedAt=performance.now();
+        if(active?.vid!==vid)return;
+        jump(e);
+        if(resume)vid.play().catch(()=>{});
+        // Keep the preview alive for another window from the new position.
+        const left=Math.max(0,(Number(vid.duration)||0)-vid.currentTime)/PREVIEW_SPEED;
+        clearTimeout(vid._dpPreviewTimer);
+        vid._dpPreviewTimer=setTimeout(()=>{if(active?.vid===vid)active.stop()},Math.min(previewWindow(vid.duration),left)*1000);
+      };
+      strip.addEventListener('pointerup',end);strip.addEventListener('pointercancel',end);
+      // A drag that ends over the card must not count as a click on the card link.
+      card.addEventListener('click',e=>{if(vid._dpScrubbedAt&&performance.now()-vid._dpScrubbedAt<400){e.preventDefault();e.stopPropagation();vid._dpScrubbedAt=0}},true);
+    }
+    card.classList.add('scrubbable');
+    const knob=strip.firstChild;
+    const tick=()=>{
+      if(active?.vid!==vid||!card.classList.contains('scrubbable'))return;
+      const d=vid.duration;if(d&&isFinite(d))knob.style.left=Math.min(100,Math.max(0,vid.currentTime/d*100)).toFixed(2)+'%';
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
   function previewWindow(d){d=Number(d)||0;if(d<600)return 30;if(d<1200)return 40;if(d<2400)return 50;return 60}
   function start(vid,card,startAt=0,fromRight=false){
     // Local D Vault cards intentionally do not need a network data-src.
@@ -37,7 +88,7 @@
     active={vid,card,stop:finish};
     const begin=()=>{try{vid.currentTime=Math.max(0,Math.min(Number(startAt)||0,(vid.duration||9)-.05))}catch(_){}
       vid.muted=true;vid.playsInline=true;vid.loop=false;vid.defaultPlaybackRate=PREVIEW_SPEED;vid.playbackRate=PREVIEW_SPEED;
-      vid.play().then(()=>{card.classList.add('previewing');trackBar(vid,card,fromRight,false);const left=Math.max(0,(Number(vid.duration)||0)-Math.max(0,Number(startAt)||0))/PREVIEW_SPEED;vid._dpPreviewTimer=setTimeout(finish,Math.min(previewWindow(vid.duration),left)*1000)}).catch(()=>finish());
+      vid.play().then(()=>{card.classList.add('previewing');trackBar(vid,card,fromRight,false);if(!fromRight)attachScrub(vid,card);const left=Math.max(0,(Number(vid.duration)||0)-Math.max(0,Number(startAt)||0))/PREVIEW_SPEED;vid._dpPreviewTimer=setTimeout(finish,Math.min(previewWindow(vid.duration),left)*1000)}).catch(()=>finish());
     };
     if(vid.readyState>=1)begin();else vid.addEventListener('loadedmetadata',begin,{once:true});
   }

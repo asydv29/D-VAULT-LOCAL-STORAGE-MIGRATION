@@ -26,9 +26,59 @@
     const st=v&&states.get(v);if(!st)return false;
     states.delete(v);
     try{st.cleanup&&st.cleanup(reason)}catch(_){}
+    try{st.audioStop&&st.audioStop()}catch(_){}
     ['play','emptied','loadstart'].forEach(e=>v.removeEventListener(e,st.foreign));
     if(!silent){try{st.onStop&&st.onStop(v)}catch(_){}}
     return true;
+  }
+
+
+  // ---------- reversed sound ----------
+  // Decodes the file's audio once, reverses the samples, and plays them backwards in step with the
+  // reverse picture. Skipped (silent, as before) for very long/large files, where decoding the whole
+  // soundtrack into memory would be too heavy, and whenever the browser can't decode the audio.
+  const MAX_AUDIO_SECONDS=1200,MAX_AUDIO_BYTES=700*1024*1024;
+  let audioCache=null; // {src, promise}
+  function loadReversed(src,ctx,dur){
+    if(audioCache&&audioCache.src===src&&audioCache.ctx===ctx)return audioCache.promise;
+    const promise=(async()=>{
+      if(dur>MAX_AUDIO_SECONDS)return null;
+      const r=await fetch(src);if(!r.ok)return null;
+      const len=Number(r.headers.get('content-length'))||0;if(len>MAX_AUDIO_BYTES)return null;
+      const buf=await ctx.decodeAudioData(await r.arrayBuffer());
+      for(let c=0;c<buf.numberOfChannels;c++)buf.getChannelData(c).reverse();
+      return buf;
+    })().catch(()=>null);
+    audioCache={src,ctx,promise};return promise;
+  }
+  function attachAudio(v,st,dur){
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+    let ctx;try{ctx=new AC({sampleRate:22050})}catch(_){try{ctx=new AC()}catch(__){return}}
+    const gain=ctx.createGain();gain.connect(ctx.destination);
+    let buf=null,src=null,srcRate=0,timer=0,dead=false;
+    const getT=()=>st.seekMode?v.currentTime:(typeof st.T==='number'?st.T:v.currentTime);
+    const killSrc=()=>{if(src){try{src.onended=null;src.stop()}catch(_){}try{src.disconnect()}catch(_){}src=null}};
+    const check=()=>{
+      if(dead||!buf)return;
+      gain.gain.value=v.muted?0:Math.max(0,Math.min(1,v.volume));
+      if(st.paused){killSrc();return}
+      if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+      const rate=Math.max(.25,Math.min(4,Number(v.playbackRate)||1));
+      const T=Math.max(0,Math.min(getT(),buf.duration));
+      const want=buf.duration-T; // position inside the reversed buffer
+      if(want>=buf.duration-.02||T<=.02){killSrc();return}
+      if(src&&srcRate===rate){
+        const pos=src._off+(ctx.currentTime-src._t0)*rate;
+        if(Math.abs(pos-want)<.3)return;
+      }
+      killSrc();
+      const s=ctx.createBufferSource();s.buffer=buf;s.playbackRate.value=rate;s.connect(gain);
+      s._off=want;s._t0=ctx.currentTime;srcRate=rate;
+      try{s.start(0,want)}catch(_){return}
+      src=s;
+    };
+    loadReversed(v.currentSrc||v.src,ctx,dur).then(b=>{if(dead||!b)return;buf=b;check();timer=setInterval(check,200)});
+    st.audioStop=()=>{dead=true;clearInterval(timer);killSrc();try{ctx.close()}catch(_){}audioCache=null};
   }
 
   // ---------- smooth path: forward-decoded chunks drawn in reverse ----------
@@ -166,7 +216,7 @@
 
   // ---------- fallback: step backwards by seeking ----------
   function runSeek(v,st,dur){
-    st.waiting=false;st.last=performance.now();st.guard=0;st.raf=0;
+    st.seekMode=true;st.waiting=false;st.last=performance.now();st.guard=0;st.raf=0;
     st.onSeeked=()=>{st.waiting=false;clearTimeout(st.guard)};
     v.addEventListener('seeked',st.onSeeked);
     st.cleanup=()=>{cancelAnimationFrame(st.raf);clearTimeout(st.guard);v.removeEventListener('seeked',st.onSeeked)};
@@ -206,6 +256,7 @@
     };
     states.set(v,st);
     ['play','emptied','loadstart'].forEach(e=>v.addEventListener(e,st.foreign));
+    attachAudio(v,st,dur);
     const fallback=()=>{
       if(states.get(v)!==st)return;
       try{st.cleanup&&st.cleanup('fallback')}catch(_){}

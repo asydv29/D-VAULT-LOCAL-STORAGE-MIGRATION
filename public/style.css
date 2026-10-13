@@ -2570,3 +2570,11 @@ html body #likedToggle:focus-visible{
 .yt-topbar .avatar,.home-topbar .avatar,.topbar-icons .avatar{display:none!important}
 
 .watch-page .topbar-icon-btn.active{background:#ffffff33}
+
+/* Hover-preview timeline scrubber: press/click/drag along the bottom edge to jump */
+.thumb-scrub{display:none;position:absolute;left:0;right:0;bottom:0;height:18px;z-index:4;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+.previewing.scrubbable>.thumb-scrub{display:block}
+.thumb-scrub i{position:absolute;bottom:-1px;left:0;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 0 4px #0008;transform:translateX(-50%) scale(0);transition:transform .12s ease;pointer-events:none}
+.thumb-scrub:hover i,.thumb-scrub.dragging i{transform:translateX(-50%) scale(1)}
+.thumb-scrub:hover~.thumb-loadbar,.thumb-scrub.dragging~.thumb-loadbar{height:5px}
+.thumb .duration,.thumb .short-badge{pointer-events:none}
