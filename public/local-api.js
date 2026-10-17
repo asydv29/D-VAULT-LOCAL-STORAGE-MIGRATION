@@ -63,7 +63,11 @@
     id=String(id);if(mediaUrls.has(id))return mediaUrls.get(id);
     const r=await getRec(id);if(!r)return null;
     if(r.native&&r.url){mediaUrls.set(id,r.url);return r.url}
-    const f=await blobFor(r),u=URL.createObjectURL(f);mediaUrls.set(id,u);return u;
+    let f=await blobFor(r);
+    // Some storage backends hand back files with an empty/odd MIME type; the player then
+    // may refuse an otherwise valid mp4. Re-label (no data copy) from the file extension.
+    if(!/^video\//i.test(f.type||"")&&r.type==="video"){const t=r.mimeType&&/^video\//i.test(r.mimeType)?r.mimeType:extMime(r.filename||"");f=f.slice(0,f.size,t)}
+    const u=URL.createObjectURL(f);mediaUrls.set(id,u);return u;
   }
   async function thumbnailUrl(id){
     const k=id+":thumburl";if(mediaUrls.has(k))return mediaUrls.get(k);

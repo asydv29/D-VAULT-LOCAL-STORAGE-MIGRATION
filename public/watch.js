@@ -402,6 +402,23 @@ async function main(){
      box.addEventListener("click",e=>e.stopPropagation());
      box.addEventListener("touchstart",e=>e.stopPropagation(),{passive:true});
    };
+   // Reads the first/last MBs of the file (where the mp4 'stsd' codec tag lives) to tell the user
+   // *why* the browser refuses it. Returns "HEVC (H.265)", "AV1", "H.264", "VP9" or "".
+   const sniffCodec=async()=>{
+     try{
+       let txt="";
+       for(const rng of ["bytes=0-1048575","bytes=-4194304"]){
+         const r=await fetch(stream,{headers:{Range:rng},cache:"no-store"});
+         if(r.status!==206){try{r.body&&r.body.cancel()}catch(_){}continue}
+         txt+=new TextDecoder("latin1").decode(await r.arrayBuffer());
+       }
+       if(/hvc1|hev1/.test(txt))return "HEVC (H.265)";
+       if(/av01/.test(txt))return "AV1";
+       if(/vp09/.test(txt))return "VP9";
+       if(/avc1/.test(txt))return "H.264";
+     }catch(_){}
+     return "";
+   };
    const diagnose=async(why)=>{
      if(metaOk||diagnosing)return;
      diagnosing=true;
@@ -425,7 +442,12 @@ async function main(){
      if(status===401)return showBox("Your session expired. Please return to Storage settings.");
      if(status>=400)return showBox("Couldn't load this video ("+status+")"+(msg?": "+msg:"."));
      if(mediaErr===4||mediaErr===3){
-       const codecMsg="This browser can't play this file's video format ("+(mediaErr===4?"not supported":"decode error")+").";
+       const codecName=await sniffCodec();
+       const codecMsg=codecName==="H.264"
+         ?"This browser can't decode this H.264 video ("+(mediaErr===4?"profile/resolution too high for this device":"decode error")+")."
+         :codecName
+           ?"This video uses "+codecName+", which this browser/device can't decode."
+           :"This browser can't play this file's video format ("+(mediaErr===4?"not supported":"decode error")+").";
        if(codecFallbackFailed)return showBox(codecMsg+" Use Download and play it in another player.");
        return showBox(codecMsg+" You can try converting it in-browser, or download it and use another player.",{
          label:codecFallbackTrying?"Converting…":"Fix & Play",
@@ -488,7 +510,7 @@ async function main(){
            const pct=Math.max(0,Math.min(100,Math.round((ratio||0)*100)));
            if(box)showBox("Converting this video for playback… "+pct+"%",{label:"Converting…",onClick:()=>{}});
          });
-         await ffmpeg.run("-i",inName,"-c:v","libx264","-preset","ultrafast","-crf","23","-c:a","aac","-b:a","128k","-movflags","faststart","output.mp4");
+         await ffmpeg.run("-i",inName,"-vf","scale=-2:'min(720,ih)'","-r","30","-c:v","libx264","-preset","ultrafast","-crf","26","-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-movflags","faststart","output.mp4");
          const out=ffmpeg.FS("readFile","output.mp4");
          finalBlob=new Blob([out.buffer],{type:"video/mp4"});
          try{ffmpeg.FS("unlink","output.mp4")}catch(_){}
