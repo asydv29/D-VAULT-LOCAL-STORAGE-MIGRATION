@@ -441,6 +441,11 @@ async function main(){
      }
      if(status===401)return showBox("Your session expired. Please return to Storage settings.");
      if(status>=400)return showBox("Couldn't load this video ("+status+")"+(msg?": "+msg:"."));
+     let emptyFile=false;
+     try{if(window.DVaultStorage){const rec=await DVaultStorage.get("meta",String(id));if(rec){const f=await DVaultStorage.fileFor(rec);emptyFile=f&&f.size===0}}}catch(_){}
+     if(emptyFile){
+       return showBox("This file is empty (0 B), so there is nothing to play. It may still be copying, or the copy failed. Copy it into your storage folder again, then tap Retry.");
+     }
      if(mediaErr===4||mediaErr===3){
        const codecName=await sniffCodec();
        const codecMsg=codecName==="H.264"

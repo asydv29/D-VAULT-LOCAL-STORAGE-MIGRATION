@@ -29,14 +29,25 @@
       if(!VIDEO.test(name)&&!IMAGE.test(name))continue;
       entries.push({f,name,type:VIDEO.test(name)?"video":"image",size:Number(f.size)||0,lm:Number(f.lastModified)||0,rel:String(f.relativePath||f.path||name)});
     }
+    // Browser folder listings carry no size/date. Read them from the file handle (a few at a time)
+    // so the library shows the real size and modified date instead of "0 B" / today.
+    {const need=entries.filter(e=>e.f.fileHandle&&!e.size&&!e.lm);let ni=0;
+     const worker=async()=>{while(ni<need.length){const e=need[ni++];try{const file=await e.f.fileHandle.getFile();e.size=Number(file.size)||0;e.lm=Number(file.lastModified)||0}catch{}}};
+     await Promise.all(Array.from({length:Math.min(8,need.length)},worker))}
+    const oldByPath=new Map();old.forEach(r=>{if((r.type==="video"||r.type==="image")&&r.relativePath)oldByPath.set(r.relativePath,r)});
     // Only records whose file vanished/changed can be "moved" files; comparing
     // new files against every old record was O(n^2) with an await each.
     const liveCores=new Set(entries.map(e=>coreOf(e.size,e.lm,e.name)));
     const orphans=old.filter(r=>r.fileHandle&&(r.type==="video"||r.type==="image")&&!liveCores.has(coreOf(r.fileSize||0,r.lastModified||0,r.filename||"")));
     const seen=new Set(), out=[], dirty=[], toQueue=[];
+    const dirtyPush=r=>{dirty.push(r);return r};
     for(const e of entries){
       const {f,name,type,size,lm,rel}=e, core=coreOf(size,lm,name);
       let id=oldByCore.get(core)?.id;
+      {const op=oldByPath.get(rel);
+       // Earlier scans stored size 0 / date 0: upgrade those records in place, keeping their thumbnails.
+       if(op&&op.type===type&&!Number(op.fileSize)&&!Number(op.lastModified)&&(size||lm)&&!seen.has(op.id)){
+         seen.add(op.id);out.push(dirtyPush({...op,fileSize:size,size,lastModified:lm,createdTime:new Date(lm||Date.now()).toISOString(),fileHandle:f.fileHandle||op.fileHandle||null}));continue}}
       if(!id&&f.fileHandle&&orphans.length){for(const prev of orphans){if(prev.type===type&&!seen.has(prev.id)){try{if(await f.fileHandle.isSameEntry(prev.fileHandle)){id=prev.id;break}}catch{}}}}
       if(!id)id=await fingerprint({size,lastModified:lm,name,relativePath:rel});
       const previous=oldById.get(id)||oldByCore.get(core)||{};
