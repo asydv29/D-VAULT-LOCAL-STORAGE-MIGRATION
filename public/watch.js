@@ -419,6 +419,7 @@ async function main(){
      }catch(_){}
      return "";
    };
+   let memTried=false;
    const diagnose=async(why)=>{
      if(metaOk||diagnosing)return;
      diagnosing=true;
@@ -446,13 +447,33 @@ async function main(){
      if(emptyFile){
        return showBox("This file is empty (0 B), so there is nothing to play. It may still be copying, or the copy failed. Copy it into your storage folder again, then tap Retry.");
      }
+     if((mediaErr===4||mediaErr===3)&&!memTried&&window.DVaultStorage){
+       // Some Android browsers can't stream a large blob that is backed by a file in a granted folder.
+       // Copy the file into memory once and play that instead (no re-encoding).
+       memTried=true;
+       try{
+         showBox("Loading the video…",{label:"Please wait",onClick:()=>{}});
+         const rec=await DVaultStorage.get("meta",String(id));
+         const f=rec&&await DVaultStorage.fileFor(rec);
+         if(f&&f.size>0&&f.size<=900*1024*1024){
+           const buf=await f.arrayBuffer();
+           const mt=rec.mimeType&&/^video\//i.test(rec.mimeType)?rec.mimeType:"video/mp4";
+           const u=URL.createObjectURL(new Blob([buf],{type:mt}));
+           if(box){box.remove();box=null}
+           metaOk=false;v.src=u;v.load();v.play().catch(()=>{});
+           return;
+         }
+       }catch(_){}
+       if(box){box.remove();box=null}
+     }
      if(mediaErr===4||mediaErr===3){
        const codecName=await sniffCodec();
-       const codecMsg=codecName==="H.264"
+       let codecMsg=codecName==="H.264"
          ?"This browser can't decode this H.264 video ("+(mediaErr===4?"profile/resolution too high for this device":"decode error")+")."
          :codecName
            ?"This video uses "+codecName+", which this browser/device can't decode."
            :"This browser can't play this file's video format ("+(mediaErr===4?"not supported":"decode error")+").";
+       codecMsg+=" [error "+mediaErr+(v.error&&v.error.message?": "+v.error.message:"")+"]";
        if(codecFallbackFailed)return showBox(codecMsg+" Use Download and play it in another player.");
        return showBox(codecMsg+" You can try converting it in-browser, or download it and use another player.",{
          label:codecFallbackTrying?"Converting…":"Fix & Play",
