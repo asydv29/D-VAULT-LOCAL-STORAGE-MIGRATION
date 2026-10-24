@@ -189,7 +189,48 @@
   function prioritize(id){enqueue(id,0)}
   // Shorts: build the scrub sprite for this video now (and neighbours, lower priority).
   function prioritizeSprite(id,priority=0){enqueue(id,priority,{sprite:true})}
-  window.DVaultPreview={VERSION,THUMB_SPEC,ensureThumbnail,ensureSprite,ensureHover,enqueue,prioritize,prioritizeSprite,frameCount,setPlaybackActive,
+  // Recapture picker support: sample the whole video as `count` equal segments and,
+  // inside each one, keep the best-looking of up to 3 frames (not black/blank, with detail).
+  // Frames are reported one by one through onFrame so the picker can fill in as it goes.
+  async function candidateFrames(id,count=15,onFrame,signal){
+    const r=await recordFor(id);if(!r)throw new Error("Video not found");
+    let file=null;try{file=r.native&&r.url?r.url:await meta().fileFor(r)}catch{throw new Error("Could not open this video")}
+    const v=makeVideo(file);
+    try{
+      await waitMeta(v);
+      const d=v.duration;if(!isFinite(d)||d<=0)throw new Error("Video length unavailable");
+      const n=Math.max(1,Math.min(count,Math.floor(d)||1)),seg=d/n,out=[];
+      for(let i=0;i<n;i++){
+        if(signal?.aborted)break;
+        let best=null;
+        for(const p of [.5,.2,.8]){
+          if(signal?.aborted)break;
+          try{const f=await frameAt(v,clamp(seg*(i+p),0,Math.max(0,d-.1)),320,180);if(!best||f.score>best.score)best=f}catch{}
+          if(best&&best.score>=30)break;
+        }
+        if(best){const fr={timestamp:best.timestamp,score:best.score,dataUrl:best.canvas.toDataURL("image/jpeg",.75),duration:d};out.push(fr);if(onFrame)onFrame(fr,i,n)}
+      }
+      return out;
+    }finally{if(typeof v.src==="string"&&v.src.startsWith("blob:"))URL.revokeObjectURL(v.src);v.remove()}
+  }
+  // Make the frame at time t the video's thumbnail.
+  async function setThumbnailAt(id,t){
+    const r=await recordFor(id);if(!r)throw new Error("Video not found");
+    let file=null;try{file=r.native&&r.url?r.url:await meta().fileFor(r)}catch{throw new Error("Could not open this video")}
+    const v=makeVideo(file);
+    try{
+      await waitMeta(v);
+      const tt=clamp(Number(t)||0,0,Math.max(0,v.duration-.1));
+      const f=await frameAt(v,tt,480,270);
+      const blob=await new Promise(res=>f.canvas.toBlob(res,"image/webp",.8));
+      await meta().put("assets",{key:id+":thumbnail:"+VERSION,type:"thumbnail",id,blob,version:VERSION});
+      r.thumbnail="/api/videos/"+encodeURIComponent(id)+"/thumbnail?v="+Date.now();
+      r.thumbnailTimestamp=tt;r.thumbnailScore=f.score;r.previewVersion=VERSION;r.thumbSpec=THUMB_SPEC;
+      await saveMeta(r);window.dispatchEvent(new CustomEvent("dvault:thumbnail-ready",{detail:{id}}));
+      return r.thumbnail;
+    }finally{if(typeof v.src==="string"&&v.src.startsWith("blob:"))URL.revokeObjectURL(v.src);v.remove()}
+  }
+  window.DVaultPreview={candidateFrames,setThumbnailAt,VERSION,THUMB_SPEC,ensureThumbnail,ensureSprite,ensureHover,enqueue,prioritize,prioritizeSprite,frameCount,setPlaybackActive,
     async asset(id,type){return meta().get("assets",id+":"+type+":"+VERSION)},
     async invalidate(id){for(const k of ["thumbnail","sprite"])await meta().del("assets",id+":"+k+":"+VERSION).catch(()=>{});const r=await recordFor(id);if(r){r.thumbnail=null;r.sprite=null;await saveMeta(r)}}
   };

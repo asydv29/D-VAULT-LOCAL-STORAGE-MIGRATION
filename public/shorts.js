@@ -452,7 +452,7 @@ function wireSlide(slide){
     return spriteLoading;
   };
   const drawSpriteAt=async(t,seq)=>{
-    if(!await loadSprite()){if(seq===prevSeq)drawVideoFrame();return}
+    if(!await loadSprite()){if(seq===prevSeq&&progressBar.classList.contains("dragging"))drawVideoFrame();return}
     if(seq!==prevSeq)return;
     const interval=Number(spriteMeta.intervalSeconds)||4;
     const idx=Math.max(0,Math.min((Number(spriteMeta.frameCount)||1)-1,Math.floor(t/interval)));
@@ -491,7 +491,11 @@ function wireSlide(slide){
     drawSpriteAt(t,++prevSeq);
   }
   function hidePreview(){prevSeq++;prevBox.classList.remove("show")}
-  // Hovering the timeline no longer shows/updates the preview; it only appears while dragging.
+  // Mouse hover (no button pressed): show the preview for the point under the cursor, without seeking.
+  progressBar.addEventListener("pointermove",e=>{
+    if(e.pointerType!=="mouse"||progressBar.classList.contains("dragging"))return;
+    e.stopPropagation();showPreview(e);
+  });
   progressBar.addEventListener("pointerleave",()=>{if(!progressBar.classList.contains("dragging"))hidePreview()});
   progressBar.addEventListener("pointerdown",e=>{
     e.stopPropagation();

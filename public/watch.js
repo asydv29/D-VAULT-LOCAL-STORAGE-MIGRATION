@@ -2365,12 +2365,8 @@ async function main(){
      e.preventDefault();e.stopPropagation();
      document.querySelectorAll(".card-menu.open").forEach(m=>m.classList.remove("open"));
      const vid=recaptureBtn.dataset.recRecapture;
-     show("Recapturing thumbnail…");
-     try{
-       if(window.DVaultMedia&&DVaultMedia.forgetThumb)DVaultMedia.forgetThumb(vid);
-       const u=await window.DVaultPreview.ensureThumbnail(vid,true);
-       show(u?"Thumbnail recaptured":"Could not recapture thumbnail");
-     }catch(err){show("Could not recapture thumbnail")}
+     if(window.DVaultRecapture){DVaultRecapture.open(vid);DVaultRecapture.open.onDone=()=>show("Thumbnail changed")}
+     else show("Recapture is not available");
      return;
    }
    const thumbBtn=e.target.closest("[data-rec-thumb]");

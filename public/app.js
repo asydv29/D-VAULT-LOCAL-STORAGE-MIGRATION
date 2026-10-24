@@ -112,16 +112,10 @@ function bindCards(root){
    const v=all.find(x=>x.id===vid);
    try{await api('/api/videos/'+encodeURIComponent(vid)+'/short',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({short:!(v&&v.isShort)})});await load()}catch(err){toast(err.message)}
  });
-root.querySelectorAll('[data-recapture]').forEach(b=>b.onclick=async e=>{
+root.querySelectorAll('[data-recapture]').forEach(b=>b.onclick=e=>{
   e.preventDefault();e.stopPropagation();
   document.querySelectorAll('.card-menu.open').forEach(x=>x.classList.remove('open'));
-  const id=b.dataset.recapture;
-  toast('Recapturing thumbnail…');
-  try{
-    if(window.DVaultMedia&&DVaultMedia.forgetThumb)DVaultMedia.forgetThumb(id);
-    const u=await window.DVaultPreview.ensureThumbnail(id,true);
-    toast(u?'Thumbnail recaptured':'Could not recapture thumbnail');
-  }catch(err){toast('Could not recapture thumbnail')}
+  openRecapturePicker(b.dataset.recapture);
 });
 root.querySelectorAll('[data-thumb]').forEach(b=>b.onclick=e=>{
   e.preventDefault();e.stopPropagation();
@@ -333,6 +327,12 @@ function updateSelectBar(){
   };
   document.querySelectorAll('[data-bulk]').forEach(b=>b.onclick=()=>runBulkAction(b.dataset.bulk));
 }
+// One video: show 15 frames spread across it and let the user pick the thumbnail.
+function openRecapturePicker(id){
+  if(!window.DVaultRecapture){toast('Recapture is not available');return}
+  DVaultRecapture.open(id);
+  DVaultRecapture.open.onDone=()=>toast('Thumbnail changed');
+}
 async function runBulkAction(action){
   const ids=[...selected];
   if(!ids.length)return;
@@ -340,6 +340,7 @@ async function runBulkAction(action){
   if(action==='download'){await runBulkDownload(ids);return}
   if(action==='save'){await runBulkSaveToDevice(ids);return}
   if(action==='refreshthumb'){
+    if(ids.length===1){selectMode=false;selected.clear();render();openRecapturePicker(ids[0]);return}
     $('#selectBar').querySelectorAll('button').forEach(b=>b.disabled=true);
     let done=0,fail=0;
     for(const id of ids){
