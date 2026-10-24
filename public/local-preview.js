@@ -82,19 +82,17 @@
       await waitMeta(v);r.duration=r.duration||v.duration;r.width=r.width||v.videoWidth;r.height=r.height||v.videoHeight;
       let c,best;
       if(force){
-        // Refresh: choose a different moment than the current thumbnail. Try a few random
-        // spots (each well away from the old one) and keep the best-looking frame.
-        const d=v.duration,prev=Number(r.thumbnailTimestamp)||0,minGap=Math.min(d*.12,20),picks=[];
-        for(let i=0;i<30&&picks.length<3;i++){
-          const t=d*(.05+Math.random()*.9);
-          if(Math.abs(t-prev)>=minGap&&picks.every(x=>Math.abs(x-t)>=minGap/2))picks.push(t);
-        }
-        if(!picks.length)picks.push(clamp(prev+d*.25>d*.95?prev-d*.25:prev+d*.25,0,Math.max(0,d-.1)));
-        for(const t of picks){
-          try{const f=await frameAt(v,t,480,270);if(!best||f.score>best.score)best=f;if(best.score>=30)break}catch{}
-        }
-        if(!best)throw new Error("No suitable frame");
-        c=best.canvas;
+        // Recapture: step forward from the current thumbnail's moment.
+        //   video longer than 5 min -> every 2 min (120 s)
+        //   video 5 min or shorter  -> every 45 s
+        // When the step would run past the end, it wraps around to the start.
+        const d=v.duration,prev=Number(r.thumbnailTimestamp)||0;
+        const step=Math.min(d>300?120:45,d/2);
+        let t=prev+step;
+        if(t>d-.5)t=t%d;
+        t=clamp(t,Math.min(1,d/4),Math.max(0,d-.1));
+        const f=await frameAt(v,t,480,270);
+        best=f;c=f.canvas;
       }else{
         // Default thumbnail = the frame 30 s in (one seek, no scoring); clips under a minute use their midpoint.
         const t=clamp(v.duration>=60?THUMB_SECONDS:v.duration/2,0,Math.max(0,v.duration-.1));
