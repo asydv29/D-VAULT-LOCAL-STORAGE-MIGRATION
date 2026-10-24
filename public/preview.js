@@ -207,7 +207,7 @@
     }catch(e){warn('sprite fallback failed:',e);notify('Preview failed: '+(e&&e.message||e));return false}
   }
   // Home/grid hover preview starts only after the pointer rests on a card this long.
-  const HOVER_PREVIEW_DELAY_MS=5000;
+  const HOVER_PREVIEW_DELAY_MS=0;
   // Hover preview begins playing from this point in the video (falls back to 0 for clips this short).
   const HOVER_PREVIEW_START_SEC=5;
   function wire(){
