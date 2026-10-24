@@ -310,7 +310,7 @@ function updateSelectBar(){
       <button data-bulk="favorite" ${n?'':'disabled'}><span class="fav-icon"></span>Favorite</button>
       <button data-bulk="like" ${n?'':'disabled'}>👍 Like</button>
       <button data-bulk="save" ${n?'':'disabled'}>⬇ Download</button>
-      <button data-bulk="refreshthumb" ${n?'':'disabled'}>🔄 Refresh thumbnail</button>
+      <button data-bulk="refreshthumb" ${n?'':'disabled'}>🔄 Recapture thumbnail</button>
       <button data-bulk="delete" class="delete-btn" ${n?'':'disabled'}><img src="/icons/delete-icon.png" alt="" class="menu-icon"> Delete</button>
     </div>
   </div>`;
@@ -332,14 +332,14 @@ async function runBulkAction(action){
     $('#selectBar').querySelectorAll('button').forEach(b=>b.disabled=true);
     let done=0,fail=0;
     for(const id of ids){
-      toast(`Refreshing thumbnails… ${done+fail+1}/${ids.length}`);
+      toast(`Recapturing thumbnails… ${done+fail+1}/${ids.length}`);
       try{
         if(window.DVaultMedia&&DVaultMedia.forgetThumb)DVaultMedia.forgetThumb(id);
         const u=await window.DVaultPreview.ensureThumbnail(id,true);
         if(u)done++;else fail++;
       }catch(e){fail++}
     }
-    toast(fail?`${done} refreshed, ${fail} failed`:`${done} thumbnail${done===1?'':'s'} refreshed`);
+    toast(fail?`${done} recaptured, ${fail} failed`:`${done} thumbnail${done===1?'':'s'} recaptured`);
     selectMode=false;selected.clear();
     await load();
     return;

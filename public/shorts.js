@@ -491,9 +491,7 @@ function wireSlide(slide){
     drawSpriteAt(t,++prevSeq);
   }
   function hidePreview(){prevSeq++;prevBox.classList.remove("show")}
-  progressBar.addEventListener("pointermove",e=>{
-    if(e.pointerType==="mouse"&&!progressBar.classList.contains("dragging"))showPreview(e);
-  });
+  // Hovering the timeline no longer shows/updates the preview; it only appears while dragging.
   progressBar.addEventListener("pointerleave",()=>{if(!progressBar.classList.contains("dragging"))hidePreview()});
   progressBar.addEventListener("pointerdown",e=>{
     e.stopPropagation();
@@ -673,10 +671,10 @@ function wireSlide(slide){
 
 // ---- Three-dot "more" menu: speed + quality + PiP + copy link ----
 const moreMenu=$("#shortsMoreMenu"),menuBackdrop=$("#shortsMenuBackdrop"),moreMain=$("#shortsMoreMain"),
-  speedPanel=$("#shortsSpeedPanel"),qualityPanel=$("#shortsQualityPanel"),
-  speedBtn=$("#shortsSpeedBtn"),qualityBtn=$("#shortsQualityBtn"),
-  speedValue=$("#shortsSpeedValue"),qualityValueEl=$("#shortsQualityValue"),
-  pipBtn=$("#shortsPipBtn"),reportBtn=$("#shortsReportBtn"),qualityStatus=$("#shortsQualityStatus"),
+  speedPanel=$("#shortsSpeedPanel"),qualityPanel=$("#shortsQualityPanel")||document.createElement("div"),
+  speedBtn=$("#shortsSpeedBtn"),qualityBtn=$("#shortsQualityBtn")||document.createElement("button"),
+  speedValue=$("#shortsSpeedValue"),qualityValueEl=$("#shortsQualityValue")||document.createElement("span"),
+  pipBtn=$("#shortsPipBtn"),reportBtn=$("#shortsReportBtn"),qualityStatus=$("#shortsQualityStatus")||document.createElement("div"),
   watchFullBtn=$("#shortsWatchFullBtn"),removeBtn=$("#shortsRemoveBtn"),downloadDeviceBtn=$("#shortsDownloadDeviceBtn"),
   detailsBtn=$("#shortsDetailsBtn"),detailsPanel=$("#shortsDetailsPanel"),detailsBody=$("#shortsDetailsBody"),
   watchLaterBtn=$("#shortsWatchLaterBtn"),watchLaterLabel=$("#shortsWatchLaterLabel");

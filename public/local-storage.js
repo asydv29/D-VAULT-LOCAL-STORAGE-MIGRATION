@@ -96,6 +96,25 @@
     return pickBrowserFolder();
   }
 
+  // The chosen folder is only remembered for 2 hours. After that the saved
+  // handle/token is dropped and the user is asked to pick the folder again.
+  // Indexed metadata/thumbnails are kept; only the folder access is forgotten.
+  const PATH_TTL_MS=2*60*60*1000;
+  async function expireIfStale(){
+    try{
+      const r=await get("handles",KEY);
+      const n=await get("settings","androidRoot");
+      const t=Math.max(r?.updatedAt||0,n?.selectedAt||0);
+      if(!r&&!n)return false;
+      if(t&&Date.now()-t<PATH_TTL_MS)return false;
+      await clearRoot();
+      return true;
+    }catch{return false}
+  }
+  async function clearRoot(){
+    await del("handles",KEY);await del("settings","androidRoot");await del("settings","active");
+  }
+
   async function getActive(){
     const h=await getRoot();
     if(h)return {kind:"browser",handle:h,name:h.name};
@@ -223,7 +242,7 @@
   async function scan(){return window.DVaultAPI?.scan?window.DVaultAPI.scan():[]}
   window.DVaultStorage={
     db,get,put,del,all,putMany,allKeys,getMany,delMany,selectFolder,getRoot,getActive,ensurePermission,scan,listFiles,getFile,fileFor,getFileUrl,getMetadata,saveMetadata,deleteFile,renameFile,createFolder,exists,fileHandleFor,
-    async clearRoot(){await del("handles",KEY);await del("settings","androidRoot")},
+    clearRoot,expireIfStale,PATH_TTL_MS,
     isBrowserSupported:()=>!!window.showDirectoryPicker,
     isAndroidBridge:()=>!!(window.DVaultAndroid&&typeof window.DVaultAndroid.pickFolder==="function")
   };

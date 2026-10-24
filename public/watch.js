@@ -1081,7 +1081,8 @@ async function main(){
  // 240p–1080p are produced on demand with FFmpeg.wasm right in the browser
  // (there's no server-side transcoding pipeline here) and cached per-session
  // so switching back to a resolution you already prepared is instant.
- const qb=$("#qualityBtn"),qm=$("#qualityMenu"),qualityStatus=$("#qualityStatus");
+ // Quality option removed from the UI; detached stand-ins keep the legacy code below inert.
+ const qb=$("#qualityBtn")||document.createElement("button"),qm=$("#qualityMenu")||document.createElement("div"),qualityStatus=$("#qualityStatus");
  const QUALITY_LABELS={auto:"Auto",original:"Original","1080":"1080p","720":"720p","480":"480p","360":"360p","240":"240p"};
  let currentQuality="original",qualityBusy=false,sourceFsName=null,sourceFsFrom=null;
  const qualityCache={};
@@ -1973,7 +1974,7 @@ async function main(){
  }
 
  // Keyboard shortcuts.
- const speeds=[.5,.75,1,1.25,1.5,1.75,2,2.5,3];
+ const speeds=[.5,.75,1,1.25,1.5,1.75,2,2.5,3,3.5,4,4.5,5];
  const nudgeSpeed=dir=>{
    const cur=v.playbackRate;
    let idx=0,best=Infinity;
@@ -2122,7 +2123,7 @@ async function main(){
        <a class="rec-thumb-link" href="/watch.html?id=${encodeURIComponent(x.id)}">
          <div class="rec-thumb">
            <img src="${esc(thumbFor(x))}" alt="" loading="lazy" onerror="window.handleRecThumbFail&&window.handleRecThumbFail(this,'${esc(x.id)}')">
-           <video class="rec-thumb-preview" muted loop playsinline preload="none" data-src="${x.preview?.ready&&x.preview?.hover?esc(x.preview.hover):''}" data-src-rev="${x.preview?.ready&&x.preview?.hoverRev?esc(x.preview.hoverRev):''}"></video>
+           <video class="rec-thumb-preview" muted loop playsinline preload="none" data-local-id="${esc(x.id)}" data-src="${x.preview?.ready&&x.preview?.hover?esc(x.preview.hover):''}" data-src-rev="${x.preview?.ready&&x.preview?.hoverRev?esc(x.preview.hoverRev):''}"></video>
            ${x.isShort?'<span class="short-badge">Shorts</span>':''}
            <span class="rec-play">▶</span>
          </div>
@@ -2160,6 +2161,7 @@ async function main(){
  // edge with no leftover blank space.
  let UP_NEXT_COUNT=2;
  const UP_NEXT_BASE_GAP=16;
+ const UP_NEXT_EXTRA=1;
  // A phone with "Request desktop site" turned on reports a wide viewport
  // (matchMedia width checks alone would think it's a real desktop window),
  // but it's still a touch device - pointer/hover media features see through
@@ -2181,7 +2183,9 @@ async function main(){
    if(!cardHeight)return{count:Math.min(2,recOrder.length),gap:UP_NEXT_BASE_GAP};
    const playerHeight=ply.getBoundingClientRect().height;
    const fit=Math.floor((playerHeight+UP_NEXT_BASE_GAP)/(cardHeight+UP_NEXT_BASE_GAP));
-   const count=Math.max(1,Math.min(fit,recOrder.length));
+   // Show UP_NEXT_EXTRA more card(s) than strictly fit beside the player, so
+   // the sidebar never leaves a big empty area under the last card.
+   const count=Math.max(1,Math.min(fit+UP_NEXT_EXTRA,recOrder.length));
    // Distribute whatever's left over after the fixed-size cards across the
    // gaps between them, so the cards themselves never change size but the
    // stack's total height still lands exactly on the player's bottom edge.
@@ -2245,7 +2249,7 @@ async function main(){
        <a class="rec-thumb-link" href="/watch.html?id=${encodeURIComponent(x.id)}">
          <div class="rec-thumb">
            <img src="${esc(thumbFor(x))}" alt="" loading="lazy" onerror="window.handleRecThumbFail&&window.handleRecThumbFail(this,'${esc(x.id)}')">
-           <video class="rec-thumb-preview" muted loop playsinline preload="none" data-src="${x.preview?.ready&&x.preview?.hover?esc(x.preview.hover):''}" data-src-rev="${x.preview?.ready&&x.preview?.hoverRev?esc(x.preview.hoverRev):''}"></video>
+           <video class="rec-thumb-preview" muted loop playsinline preload="none" data-local-id="${esc(x.id)}" data-src="${x.preview?.ready&&x.preview?.hover?esc(x.preview.hover):''}" data-src-rev="${x.preview?.ready&&x.preview?.hoverRev?esc(x.preview.hoverRev):''}"></video>
            ${x.isShort?'<span class="short-badge">Shorts</span>':''}
            <span class="rec-play">▶</span>
          </div>
@@ -2286,6 +2290,9 @@ async function main(){
    // instead of relying only on the scroll-triggered sentinel for the first screen.
    const initialFill=Math.min(REC_MAX_CARDS,Math.max(recCursor+REC_PAGE_SIZE*2,recOrder.length));
    while(recCursor<initialFill&&appendRecommendations());
+   // Also wire the up-next sidebar cards (appendRecommendations may not run
+   // when every video already fits in the sidebar).
+   window.DPlayerPreview&&window.DPlayerPreview.wire();
  }
  function appendRecommendations(){
    // Each video is shown at most once on this page: the up-next queue plus

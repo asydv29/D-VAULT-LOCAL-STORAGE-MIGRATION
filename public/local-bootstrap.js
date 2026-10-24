@@ -67,6 +67,8 @@
   async function init(){
     try{navigator.storage?.persist?.()}catch{}
     try{
+      // Saved folder is valid for 2 hours only; after that ask for it again.
+      await window.DVaultStorage.expireIfStale();
       const a=await window.DVaultStorage.getActive();
       if(a){
         try{

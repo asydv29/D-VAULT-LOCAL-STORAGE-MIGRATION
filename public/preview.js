@@ -86,7 +86,7 @@
     if(vid._dpEnded)vid.removeEventListener('ended',vid._dpEnded);
     const finish=()=>{clearTimeout(vid._dpPreviewTimer);vid._dpPreviewTimer=null;stop(vid,card)};vid._dpEnded=finish;vid.addEventListener('ended',finish,{once:true});
     active={vid,card,stop:finish};
-    const begin=()=>{try{vid.currentTime=Math.max(0,Math.min(Number(startAt)||0,(vid.duration||9)-.05))}catch(_){}
+    const begin=()=>{try{let s0=Number(startAt)||0;if(!fromRight&&s0>0&&vid.duration&&s0>=vid.duration-1)s0=0;vid.currentTime=Math.max(0,Math.min(s0,(vid.duration||9)-.05))}catch(_){}
       vid.muted=true;vid.playsInline=true;vid.loop=false;vid.defaultPlaybackRate=PREVIEW_SPEED;vid.playbackRate=PREVIEW_SPEED;
       vid.play().then(()=>{card.classList.add('previewing');trackBar(vid,card,fromRight,false);if(!fromRight)attachScrub(vid,card);const left=Math.max(0,(Number(vid.duration)||0)-Math.max(0,Number(startAt)||0))/PREVIEW_SPEED;vid._dpPreviewTimer=setTimeout(finish,Math.min(previewWindow(vid.duration),left)*1000)}).catch(()=>finish());
     };
@@ -150,6 +150,10 @@
     };
     raf=requestAnimationFrame(tick);
   }
+  // Home/grid hover preview starts only after the pointer rests on a card this long.
+  const HOVER_PREVIEW_DELAY_MS=5000;
+  // Hover preview begins playing from this point in the video (falls back to 0 for clips this short).
+  const HOVER_PREVIEW_START_SEC=5;
   function wire(){
     const hover=matchMedia('(hover:hover) and (pointer:fine)').matches;
     document.querySelectorAll(cardSelector).forEach(card=>{
@@ -160,11 +164,11 @@
       if(hover){
         if(vid.dataset.dpHover)return;vid.dataset.dpHover='1';
         let timer=null;
-        card.addEventListener('mouseenter',()=>{clearTimeout(timer);if(active?.vid===vid)return;card.classList.add('loading');timer=setTimeout(async()=>{try{
+        card.addEventListener('mouseenter',()=>{clearTimeout(timer);if(active?.vid===vid)return;timer=setTimeout(async()=>{card.classList.add('loading');try{
           const src=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):vid.dataset.src;
           if(!src)throw new Error('No local or remote preview source');
-          vid.src=src;vid.preload='auto';card.classList.remove('loading');start(vid,card,0);
-        }catch{card.classList.remove('loading')}},100)});
+          vid.src=src;vid.preload='auto';card.classList.remove('loading');start(vid,card,HOVER_PREVIEW_START_SEC);
+        }catch{card.classList.remove('loading')}},HOVER_PREVIEW_DELAY_MS)});
         card.addEventListener('mouseleave',()=>{clearTimeout(timer);if(active?.vid===vid)return;card.classList.remove('loading');if(vid.src){vid.removeAttribute('src');vid.load()}});
       }else{
         if(vid.dataset.dpTouch)return;vid.dataset.dpTouch='1';

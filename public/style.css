@@ -594,6 +594,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   border:1px solid #3b3b3b;
   border-radius:10px;
   padding:5px;
+  max-height:calc(100vh - 80px);
+  overflow-y:auto;
   box-shadow:0 12px 40px #000;
 }
 .watch-page .more-menu.show{display:block}
