@@ -224,6 +224,13 @@
           set.set(path,cur);
         }
       }
+      // Also list real directories that hold no media yet (e.g. freshly created folders).
+      try{
+        for(const d of await S.listDirs()){
+          const parts=d.split("/").filter(Boolean);let path="";
+          for(const part of parts){path=path?path+"/"+part:part;if(!set.has(path))set.set(path,{count:0})}
+        }
+      }catch{}
       const out=[...set.entries()].map(([id,v])=>({
         id,
         name:id.split("/").pop(),
@@ -234,13 +241,23 @@
       out.sort((a,b)=>a.path.localeCompare(b.path));
       return json(out);
     }
+    if(p==="/api/folders"&&req.method==="POST"){
+      const b=await req.json().catch(()=>({}));
+      const name=String(b.name||"").trim();
+      if(!name)return err("A folder name is required");
+      try{
+        const rel=await S.createFolderAt(String(b.parentId||b.parent||""),name);
+        try{window.dispatchEvent(new CustomEvent("dvault:folders-changed",{detail:{path:rel}}))}catch{}
+        return json({id:rel,name:rel.split("/").pop(),path:rel,count:0,parentId:rel.includes("/")?rel.slice(0,rel.lastIndexOf("/")):null});
+      }catch(e){return err(e.message||"Could not create folder",400)}
+    }
     if(p==="/api/photos"&&req.method==="GET"){let ps=(await records()).filter(x=>x.type==="image");if(!ps.length){try{await scan();ps=(await records()).filter(x=>x.type==="image")}catch{}}return json(await Promise.all(ps.map(async r=>({id:r.id,title:r.title,name:r.filename,isVideo:false,liked:r.liked,thumb:(await thumbnailUrl(r.id))||"/api/photos/"+encodeURIComponent(r.id)+"/thumbnail",url:await mediaUrl(r.id)}))))}
     if(p==="/api/liked"||p==="/api/favorites"||p==="/api/watch-later"){const q=new URLSearchParams();q.set("list",p.includes("liked")?"liked":p.includes("favorites")?"favorites":"watchlater");return json(await videoList(q))}
     if(p==="/api/playlists"&&req.method==="GET"){const pls=await S.all("settings");const arr=pls.filter(x=>x.key.startsWith("playlist:")).map(x=>x.value);const vid=u.searchParams.get("videoId");return json(arr.map(pl=>({...pl,count:pl.videoIds?.length||0,inPlaylist:vid?pl.videoIds?.includes(vid):false})))}
     if(p==="/api/playlists"&&req.method==="POST"){const b=await req.json();const pl={id:uid(),name:String(b.name||"Untitled").slice(0,200),videoIds:[]};await S.put("settings",{key:"playlist:"+pl.id,value:pl});return json(pl)}
     let m=p.match(/^\/api\/playlists\/([^/]+)\/videos(?:\/([^/]+))?$/);if(m){const pl=await S.get("settings","playlist:"+decodeURIComponent(m[1]));if(!pl?.value)return err("Playlist not found",404);const v=pl.value,vid=decodeURIComponent(m[2]||"");if(req.method==="POST"){const b=await req.json();if(!v.videoIds.includes(b.videoId))v.videoIds.push(b.videoId)}else if(req.method==="DELETE"){v.videoIds=v.videoIds.filter(x=>x!==vid)}await S.put("settings",{key:"playlist:"+v.id,value:v});return json({ok:true})}
     m=p.match(/^\/api\/playlists\/([^/]+)$/);if(m){const key="playlist:"+decodeURIComponent(m[1]),rec=await S.get("settings",key);if(!rec)return err("Playlist not found",404);if(req.method==="DELETE"){await S.del("settings",key);return json({ok:true})}if(req.method==="POST"){const b=await req.json();rec.value.name=String(b.name||rec.value.name);await S.put("settings",rec);return json(rec.value)}}
-    m=p.match(/^\/api\/videos\/([^/]+)\/(like|favorite|watchlater|view|stream|thumbnail|delete|short|orientation|rename)$/);
+    m=p.match(/^\/api\/videos\/([^/]+)\/(like|favorite|watchlater|view|stream|thumbnail|delete|short|orientation|rename|move)$/);
     if(m){const id=decodeURIComponent(m[1]),act=m[2],r=await getRec(id);if(!r)return err("Video not found",404);
       if(act==="like")return toggle(id,"liked");
       if(act==="favorite")return toggle(id,"favorite");
@@ -248,6 +265,24 @@
       if(act==="view"&&req.method==="POST"){r.views=(r.views||0)+1;addHistory(id);await S.put("meta",r);return json({ok:true})}
       if(act==="short"&&req.method==="POST"){const b=await req.json();r.isShort=!!b.short;await S.put("meta",r);return json({isShort:r.isShort})}
       if(act==="rename"&&req.method==="POST"){const b=await req.json();const oldName=r.filename;const name=String(b.name||"").trim();if(!name)return err("A video name is required");const ext=(oldName.match(/(\.[^.]+)$/)||[])[1]||"";const finalName=name.toLowerCase().endsWith(ext.toLowerCase())?name:name+ext;await S.renameFile(r,finalName);r.filename=finalName;r.title=finalName.replace(/\.[^.]+$/,"");r.relativePath=r.relativePath.replace(/[^/]+$/,finalName);r.path=r.relativePath;r.thumbnail=null;r.sprite=null;r.previewStatus="queued";await S.put("meta",r);mediaUrls.delete(id+":thumburl");if(P)P.invalidate(id);return json({ok:true,id,name:r.title})}
+      if(act==="move"&&req.method==="POST"){
+        const b=await req.json().catch(()=>({}));
+        const dest=String(b.folder||"").split("/").map(x=>x.trim()).filter(Boolean).join("/");
+        try{
+          const res=await S.moveFile(r,dest);
+          if(res.unchanged)return json({ok:true,id,folder:dest,unchanged:true});
+          r.relativePath=res.relativePath;r.path=res.relativePath;r.folder=dest;
+          if(res.name&&res.name!==r.filename)r.filename=res.name;
+          if(res.fileHandle)r.fileHandle=res.fileHandle;
+          if(res.url)r.url=res.url;
+          // Keep size/date in sync with the moved file so the next scan recognises it
+          // as the same item (keeps likes, history and thumbnails).
+          if(res.size!=null){r.fileSize=res.size;r.size=res.size}
+          if(res.lastModified!=null)r.lastModified=res.lastModified;
+          await S.put("meta",r);
+          return json({ok:true,id,folder:dest});
+        }catch(e){return err(e.message||"Could not move file",400)}
+      }
       if(act==="delete"&&(req.method==="DELETE"||req.method==="POST")){await S.deleteFile(r);await S.del("meta",id);for(const k of ["thumbnail","sprite"])await S.del("assets",id+":"+k+":"+(P?.VERSION||2)).catch(()=>{});return json({ok:true})}
       if(act==="orientation"&&req.method==="POST"){const b=await req.json().catch(()=>({}));r.width=Number(b.width)||r.width;r.height=Number(b.height)||r.height;r.duration=Number(b.duration)||r.duration;r.isShort=r.height>r.width;await S.put("meta",r);return json({isPortrait:r.isShort,isShort:r.isShort,duration:fmtDur(r.duration),quality:quality(r.width,r.height),orientationKnown:!!(r.width&&r.height)})}
       if(act==="thumbnail"&&req.method==="POST"){const blob=await req.blob();await S.put("assets",{key:id+":thumbnail:"+(P?.VERSION||2),type:"thumbnail",id,blob,version:P?.VERSION||2});mediaUrls.delete(id+":thumburl");r.thumbnail="/api/videos/"+encodeURIComponent(id)+"/thumbnail?v="+Date.now();r.thumbnailTimestamp=null;r.previewVersion=P?.VERSION||2;await S.put("meta",r);return json({ok:true})}

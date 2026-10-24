@@ -2580,3 +2580,10 @@ html body #likedToggle:focus-visible{
 .thumb-scrub:hover i,.thumb-scrub.dragging i{transform:translateX(-50%) scale(1)}
 .thumb-scrub:hover~.thumb-loadbar,.thumb-scrub.dragging~.thumb-loadbar{height:5px}
 .thumb .duration,.thumb .short-badge{pointer-events:none}
+
+/* ---- Folders header: "+" (new folder) button beside the Folders toggle ---- */
+#sidebar .side-title-row.folders-head{padding:0}
+#sidebar .folders-head .side-title-toggle{flex:1 1 auto;min-width:0;width:auto}
+#sidebar .folders-head .side-title-toggle .side-chevron{padding-right:6px}
+#sidebar .folders-head .side-title-action{flex:0 0 28px;margin-right:8px}
+.folder-merge-item.folder-merge-new{border-bottom:1px solid #333;margin-bottom:4px;border-radius:7px 7px 0 0;font-weight:600}

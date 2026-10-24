@@ -315,6 +315,7 @@ function updateSelectBar(){
       <button data-bulk="favorite" ${n?'':'disabled'}><span class="fav-icon"></span>Favorite</button>
       <button data-bulk="like" ${n?'':'disabled'}>👍 Like</button>
       <button data-bulk="save" ${n?'':'disabled'}>⬇ Download</button>
+      <button data-bulk="move" ${n?'':'disabled'}>📁 Move to folder</button>
       <button data-bulk="refreshthumb" ${n?'':'disabled'}>🔄 Recapture thumbnail</button>
       <button data-bulk="delete" class="delete-btn" ${n?'':'disabled'}><img src="/icons/delete-icon.png" alt="" class="menu-icon"> Delete</button>
     </div>
@@ -337,6 +338,7 @@ async function runBulkAction(action){
   const ids=[...selected];
   if(!ids.length)return;
   if(action==='delete'&&!confirm(`Delete ${ids.length} video${ids.length>1?'s':''}? They will be deleted from the selected storage folder.`))return;
+  if(action==='move'){showMoveToFolderModal(ids);return}
   if(action==='download'){await runBulkDownload(ids);return}
   if(action==='save'){await runBulkSaveToDevice(ids);return}
   if(action==='refreshthumb'){
@@ -370,6 +372,66 @@ async function runBulkAction(action){
   selectMode=false;selected.clear();
   await load();
 }
+// Bulk "Move to folder": pick a destination in the shared modal (existing
+// folder, the storage root, or a brand-new folder), then move each selected
+// file there inside the chosen storage folder. Likes/history/thumbnails stay
+// with the file because the library record keeps its id (see the /move route
+// in local-api.js).
+function showMoveToFolderModal(ids){
+  $('#modalTitle').textContent='Move '+ids.length+' item'+(ids.length===1?'':'s')+' to…';
+  $('#modalText').textContent='Choose a folder inside your storage folder. The files are moved on disk.';
+  const actions=$('#modalActions');
+  actions.innerHTML='';
+  const list=document.createElement('div');
+  list.className='folder-merge-list';
+  const addRow=(html,title,onclick,extra)=>{
+    const row=document.createElement('div');
+    row.className='folder-merge-item'+(extra?' '+extra:'');
+    if(title)row.title=title;
+    row.innerHTML=html;
+    row.onclick=onclick;
+    list.appendChild(row);
+  };
+  const icon=window.DPSidebarIcons?window.DPSidebarIcons.folder:'';
+  addRow('<span>＋ New folder…</span>','Create a folder and move the files into it',async()=>{
+    const name=(prompt('New folder name (use / for a subfolder, e.g. Movies/Action):')||'').trim();
+    if(!name)return;
+    try{
+      const f=await api('/api/folders',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name})});
+      await moveSelectedTo(ids,f.id,f.id);
+    }catch(err){toast(err.message||'Could not create folder')}
+  },'folder-merge-new');
+  addRow('<span>'+icon+' Storage root (no folder)</span>','',()=>moveSelectedTo(ids,'','Storage root'));
+  [...folders].sort((a,b)=>String(a.path||a.id).localeCompare(String(b.path||b.id))).forEach(f=>{
+    const path=String(f.path||f.id);
+    const depth=path.split('/').length-1;
+    addRow('<span style="padding-left:'+(depth*14)+'px">'+icon+' '+esc(f.name)+'</span>',path,()=>moveSelectedTo(ids,f.id,path));
+  });
+  actions.appendChild(list);
+  $('#modal').classList.add('show');
+}
+async function moveSelectedTo(ids,dest,label){
+  $('#modal').classList.remove('show');
+  clearModalActions();
+  $('#selectBar').querySelectorAll('button').forEach(b=>b.disabled=true);
+  let ok=0,fail=0,same=0,firstErr='';
+  for(let i=0;i<ids.length;i++){
+    toast('Moving… '+(i+1)+'/'+ids.length);
+    try{
+      const r=await api('/api/videos/'+encodeURIComponent(ids[i])+'/move',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({folder:dest})});
+      if(r&&r.unchanged)same++;else ok++;
+    }catch(e){fail++;if(!firstErr)firstErr=e.message||''}
+  }
+  const where=label?(' to "'+label+'"'):'';
+  let msg=ok?(ok+' moved'+where):'';
+  if(same)msg+=(msg?', ':'')+same+' already there';
+  if(fail)msg+=(msg?', ':'')+fail+' failed'+(firstErr?' ('+firstErr+')':'');
+  toast(msg||'Nothing moved');
+  selectMode=false;selected.clear();
+  await load();
+  loadFolders();
+}
+window.addEventListener('dvault:folders-changed',()=>{try{loadFolders()}catch{}});
 // Bulk "Download offline": saves each selected video into the app's own
 // IndexedDB storage (see idb-downloads.js). Runs a few downloads at once
 // (BULK_DOWNLOAD_CONCURRENCY) instead of strictly one-at-a-time, so the
@@ -1051,7 +1113,10 @@ async function load(silent){
 }
 window.addEventListener('offline',()=>{if(firstLoadDone)showOfflineHome()});
 window.addEventListener('online',()=>{load()});
-window.addEventListener('dvault:library-changed',()=>{if(firstLoadDone&&!selected.size)load(true)});
+// Rebuilding the grid replaces changed cards, which cancels a hover/swipe preview in progress (and its
+// 5 s hover timer). Wait until no preview is active and the pointer/finger is off the cards.
+let libReloadT=0;
+window.addEventListener('dvault:library-changed',()=>{if(!firstLoadDone||selected.size)return;clearTimeout(libReloadT);const go=()=>{if(window.DPlayerPreview&&DPlayerPreview.busy&&DPlayerPreview.busy()){libReloadT=setTimeout(go,2000);return}load(true)};libReloadT=setTimeout(go,800)});
 $('#searchForm').onsubmit=e=>{e.preventDefault();syncSearchUrl();render()};let searchTimer=0;$('#search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{syncSearchUrl();render()},120)};document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');activeCat=b.dataset.cat;render()});
 // Home filter tabs: All / Videos / Shorts switch the grid in place;
 // Photos hands off to the dedicated Photos page (a separate library).
@@ -1153,7 +1218,8 @@ if(playlistDeleteBtn)playlistDeleteBtn.onclick=async()=>{
 document.addEventListener('click',e=>{if(!e.target.closest('.more-btn')&&!e.target.closest('.card-menu'))document.querySelectorAll('.card-menu.open').forEach(x=>x.classList.remove('open'))});
 document.addEventListener('click',e=>{if(!e.target.closest('.folder-menu-btn')&&!e.target.closest('.folder-menu'))document.querySelectorAll('.folder-menu.open').forEach(x=>x.classList.remove('open'))});
 window.addEventListener("dvault:thumbnail-ready",async e=>{const id=String(e.detail?.id||"");if(!id||!window.DVaultMedia)return;const u=await DVaultMedia.thumbnailUrl(id);if(!u)return;document.querySelectorAll('[data-watch]').forEach(a=>{if(a.dataset.watch===id){const img=a.closest(".video-card")?.querySelector(".thumb img");if(img)img.src=u}});if(!window.__dvThumbRender)window.__dvThumbRender=setTimeout(()=>{window.__dvThumbRender=0;render()},1500);});
-window.addEventListener("dvault:sprite-ready",()=>{if(typeof load==="function")load(true)});
+// No grid reload on "dvault:sprite-ready": sprites finish one by one in the background and every reload replaced
+// the card under the pointer, so hover/swipe previews never got to start. Cards do not depend on it.
 load();loadFolders();loadPlaylists();refreshDownloadedIds();
 // Coming back from the Shorts player's search icon: hand focus straight to the search box.
 if(params.get('focusSearch')){const sb=$('#search');if(sb){setTimeout(()=>{sb.focus();sb.select()},50)}}

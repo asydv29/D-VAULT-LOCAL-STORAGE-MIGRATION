@@ -79,11 +79,14 @@
       <span>History</span>
     </button>
     <div class="side-divider"></div>
-    <button class="side-title-row side-title-toggle" id="foldersToggle" type="button" aria-expanded="false">
-      <span class="side-title-icon">${ICON_FOLDER_OUTLINE}</span>
-      <span class="side-title">Folders</span>
-      <span class="side-chevron" id="foldersChevron">❯</span>
-    </button>
+    <div class="side-title-row folders-head">
+      <button class="side-title-toggle" id="foldersToggle" type="button" aria-expanded="false">
+        <span class="side-title-icon">${ICON_FOLDER_OUTLINE}</span>
+        <span class="side-title">Folders</span>
+        <span class="side-chevron" id="foldersChevron">❯</span>
+      </button>
+      <button class="side-title-action" id="newFolderBtn" type="button" aria-label="New folder" title="New folder"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
     <div id="folderTree" class="folder-tree" hidden><div class="side-small">Loading folders…</div></div>
     <div class="side-divider"></div>
     <div class="side-title-row playlists-head">
@@ -143,16 +146,41 @@
   // loading), so it's wired on every page regardless of DP_SIDEBAR_SKIP —
   // whichever script populates #folderTree (this file, or a page's own
   // richer loader) still shows/hides behind the same chevron.
+  function setFoldersOpen(open){
+    const btn=$('#foldersToggle'),tree=$('#folderTree');
+    if(!btn||!tree)return;
+    tree.hidden=!open;
+    btn.classList.toggle('open',open);
+    btn.setAttribute('aria-expanded',open?'true':'false');
+  }
   function wireFoldersToggle(){
     const btn=$('#foldersToggle'),tree=$('#folderTree');
     if(!btn||!tree)return;
-    const setOpen=open=>{
-      tree.hidden=!open;
-      btn.classList.toggle('open',open);
-      btn.setAttribute('aria-expanded',open?'true':'false');
+    setFoldersOpen(!!params.get('folder'));
+    btn.onclick=()=>setFoldersOpen(tree.hidden);
+  }
+
+  // "+" beside "Folders": creates a real folder inside the selected storage
+  // folder (use "/" in the name for subfolders, e.g. Movies/Action). Wired on
+  // every page; the tree itself is refreshed by whichever script owns it.
+  function wireNewFolder(){
+    const btn=$('#newFolderBtn');
+    if(!btn)return;
+    btn.onclick=async e=>{
+      e.stopPropagation();
+      const name=(prompt('New folder name (use / for a subfolder, e.g. Movies/Action):')||'').trim();
+      if(!name)return;
+      try{
+        const r=await fetch('/api/folders',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name})});
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(d.error||'Could not create folder');
+        notify('Folder created');
+        setFoldersOpen(true);
+        loadFolders();
+      }catch(err){notify(err.message||'Could not create folder',true)}
     };
-    setOpen(!!params.get('folder'));
-    btn.onclick=()=>setOpen(tree.hidden);
+    // local-api.js announces every folder change; keep the tree in sync.
+    window.addEventListener('dvault:folders-changed',()=>loadFolders());
   }
 
   // Expand/collapse the "Playlists" list. Created playlists stay hidden until
@@ -352,6 +380,7 @@
     wireToggle();
     wireDataView();
     wireFoldersToggle();
+    wireNewFolder();
     wirePlaylistsToggle();
     highlightActive();
     loadAccount();
@@ -374,5 +403,5 @@
   window.DPSidebarIcons={folder:ICON_FOLDER,playlist:ICON_PLAYLIST_ROW,logout:ICON_LOGOUT};
   // Lets page scripts that own their own playlist list (app.js, watch.js)
   // expand the collapsed "Playlists" section, e.g. right after creating one.
-  window.DPSidebar={openPlaylists:()=>setPlaylistsOpen(true)};
+  window.DPSidebar={openPlaylists:()=>setPlaylistsOpen(true),openFolders:()=>setFoldersOpen(true)};
 })();

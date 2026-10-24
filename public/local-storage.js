@@ -239,9 +239,109 @@
     const active=await ensurePermission();if(active?.kind==="android"){if(typeof window.DVaultAndroid.createFolder!=="function")throw new Error("Android folder creation is not available.");return window.DVaultAndroid.createFolder(active.token,parent||"",name)}
     const dir=parent||active?.handle;if(!dir)throw new Error("Storage folder is not selected.");return dir.getDirectoryHandle(String(name).trim(),{create:true})
   }
+
+  // ---- Folder helpers: create folders, list every directory (even empty ones), move files ----
+  const cleanPath=p=>String(p||"").split("/").map(x=>x.trim()).filter(Boolean).join("/");
+  function checkSegments(path){
+    const segs=cleanPath(path).split("/").filter(Boolean);
+    if(!segs.length)throw new Error("A folder name is required.");
+    for(const sgm of segs){if(sgm==="."||sgm===".."||/[\\:*?"<>|]/.test(sgm))throw new Error("Folder names can't contain \\ : * ? \" < > |");}
+    return segs.join("/");
+  }
+  async function dirHandleAt(root,path,create){
+    let d=root;
+    for(const part of cleanPath(path).split("/").filter(Boolean))d=await d.getDirectoryHandle(part,{create:!!create});
+    return d;
+  }
+  // Creates (nested) folders such as "Movies/Action". Returns the folder's relative path.
+  async function createFolderAt(parentPath,name){
+    const active=await ensurePermission();
+    if(!active)throw new Error("Storage folder is not selected.");
+    const rel=checkSegments(cleanPath(parentPath)?cleanPath(parentPath)+"/"+name:name);
+    if(active.kind==="android"){
+      const a=window.DVaultAndroid;
+      if(typeof a.createFolder!=="function")throw new Error("Android folder creation is not available.");
+      let cur="";
+      for(const part of rel.split("/")){await Promise.resolve(a.createFolder(active.token,cur,part));cur=cur?cur+"/"+part:part}
+      // The bridge may not list empty folders, so remember folders created here.
+      await put("settings",{key:"userfolder:"+rel,path:rel,createdAt:Date.now()});
+      return rel;
+    }
+    await dirHandleAt(active.handle,rel,true);
+    return rel;
+  }
+  // Every directory path under the storage root, including empty ones.
+  async function listDirs(){
+    const active=await ensurePermission().catch(()=>null);
+    if(!active)return [];
+    const out=new Set();
+    if(active.kind==="android"){
+      const a=window.DVaultAndroid;
+      try{if(typeof a.listFolders==="function"){const r=await Promise.resolve(a.listFolders(active.token));(Array.isArray(r)?r:[]).forEach(x=>{const p=cleanPath(typeof x==="string"?x:x?.path);if(p)out.add(p)})}}catch{}
+      try{(await all("settings")).forEach(x=>{if(String(x.key).startsWith("userfolder:")&&x.path)out.add(x.path)})}catch{}
+      return [...out];
+    }
+    async function walk(dir,prefix){
+      for await(const [name,entry] of dir.entries()){
+        if(entry.kind!=="directory")continue;
+        const rel=prefix?prefix+"/"+name:name;
+        out.add(rel);
+        await walk(entry,rel);
+      }
+    }
+    await walk(active.handle,"");
+    return [...out];
+  }
+  // Moves one file into destFolder ("" = storage root). Never overwrites: a name clash gets " (1)" etc.
+  // Returns {relativePath,name,fileHandle?,size?,lastModified?}.
+  async function moveFile(record,destFolder){
+    const active=await ensurePermission();
+    const dest=cleanPath(destFolder);
+    if(dest)checkSegments(dest);
+    const parts=String(record.relativePath||"").split("/").filter(Boolean);
+    const oldName=parts.pop();
+    if(cleanPath(parts.join("/"))===dest)return {relativePath:record.relativePath,name:oldName,unchanged:true};
+    if(active.kind==="android"){
+      const a=window.DVaultAndroid;
+      if(typeof a.moveFile!=="function")throw new Error("Android move is not available. The storage bridge needs a moveFile() method.");
+      if(dest)await createFolderAt("",dest);
+      const raw=await Promise.resolve(a.moveFile(active.token,record.relativePath,dest));
+      let info={};
+      if(typeof raw==="string"){try{info=JSON.parse(raw)}catch{info={path:raw}}}else if(raw&&typeof raw==="object")info=raw;
+      const newRel=cleanPath(info.path||info.relativePath)||(dest?dest+"/"+oldName:oldName);
+      return {relativePath:newRel,name:newRel.split("/").pop(),url:info.url||undefined};
+    }
+    const root=active.handle;
+    const srcDir=await dirHandleAt(root,parts.join("/"),false);
+    const destDir=await dirHandleAt(root,dest,true);
+    const exists=async n=>{try{await destDir.getFileHandle(n);return true}catch{return false}};
+    let finalName=oldName;
+    if(await exists(finalName)){
+      const m=oldName.match(/^(.*?)(\.[^.]+)?$/),base=m[1],ext=m[2]||"";
+      let i=1;while(await exists(base+" ("+i+")"+ext))i++;
+      finalName=base+" ("+i+")"+ext;
+    }
+    const srcHandle=await srcDir.getFileHandle(oldName);
+    let newHandle=null;
+    // Native move keeps the original modified date, but isn't supported everywhere; fall back to copy+delete.
+    if(typeof srcHandle.move==="function"){
+      try{await srcHandle.move(destDir,finalName);newHandle=await destDir.getFileHandle(finalName)}catch{newHandle=null}
+    }
+    if(!newHandle){
+      const file=await srcHandle.getFile();
+      const target=await destDir.getFileHandle(finalName,{create:true});
+      const w=await target.createWritable();
+      try{await w.write(file);await w.close()}catch(e){try{await w.abort?.()}catch{}try{await destDir.removeEntry(finalName)}catch{}throw e}
+      // Only remove the original once the copy has been written successfully.
+      await srcDir.removeEntry(oldName);
+      newHandle=target;
+    }
+    const f=await newHandle.getFile();
+    return {relativePath:dest?dest+"/"+finalName:finalName,name:finalName,fileHandle:newHandle,size:f.size,lastModified:f.lastModified};
+  }
   async function scan(){return window.DVaultAPI?.scan?window.DVaultAPI.scan():[]}
   window.DVaultStorage={
-    db,get,put,del,all,putMany,allKeys,getMany,delMany,selectFolder,getRoot,getActive,ensurePermission,scan,listFiles,getFile,fileFor,getFileUrl,getMetadata,saveMetadata,deleteFile,renameFile,createFolder,exists,fileHandleFor,
+    db,get,put,del,all,putMany,allKeys,getMany,delMany,selectFolder,getRoot,getActive,ensurePermission,scan,listFiles,getFile,fileFor,getFileUrl,getMetadata,saveMetadata,deleteFile,renameFile,createFolder,createFolderAt,listDirs,moveFile,exists,fileHandleFor,
     clearRoot,expireIfStale,PATH_TTL_MS,
     isBrowserSupported:()=>!!window.showDirectoryPicker,
     isAndroidBridge:()=>!!(window.DVaultAndroid&&typeof window.DVaultAndroid.pickFolder==="function")
