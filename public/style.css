@@ -2587,3 +2587,6 @@ html body #likedToggle:focus-visible{
 #sidebar .folders-head .side-title-toggle .side-chevron{padding-right:6px}
 #sidebar .folders-head .side-title-action{flex:0 0 28px;margin-right:8px}
 .folder-merge-item.folder-merge-new{border-bottom:1px solid #333;margin-bottom:4px;border-radius:7px 7px 0 0;font-weight:600}
+.folder-move-search{width:100%;box-sizing:border-box;margin:0 0 8px;padding:10px 14px;border-radius:18px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;outline:none}
+.folder-move-search:focus{border-color:#3ea6ff}
+.folder-merge-item[hidden]{display:none}

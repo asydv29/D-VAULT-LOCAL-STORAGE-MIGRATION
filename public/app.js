@@ -384,9 +384,10 @@ function showMoveToFolderModal(ids){
   actions.innerHTML='';
   const list=document.createElement('div');
   list.className='folder-merge-list';
-  const addRow=(html,title,onclick,extra)=>{
+  const addRow=(html,title,onclick,extra,q)=>{
     const row=document.createElement('div');
     row.className='folder-merge-item'+(extra?' '+extra:'');
+    if(q!=null)row.dataset.q=String(q).toLowerCase();
     if(title)row.title=title;
     row.innerHTML=html;
     row.onclick=onclick;
@@ -401,14 +402,37 @@ function showMoveToFolderModal(ids){
       await moveSelectedTo(ids,f.id,f.id);
     }catch(err){toast(err.message||'Could not create folder')}
   },'folder-merge-new');
-  addRow('<span>'+icon+' Storage root (no folder)</span>','',()=>moveSelectedTo(ids,'','Storage root'));
+  addRow('<span>'+icon+' Storage root (no folder)</span>','',()=>moveSelectedTo(ids,'','Storage root'),'','storage root no folder');
   [...folders].sort((a,b)=>String(a.path||a.id).localeCompare(String(b.path||b.id))).forEach(f=>{
     const path=String(f.path||f.id);
     const depth=path.split('/').length-1;
-    addRow('<span style="padding-left:'+(depth*14)+'px">'+icon+' '+esc(f.name)+'</span>',path,()=>moveSelectedTo(ids,f.id,path));
+    addRow('<span style="padding-left:'+(depth*14)+'px">'+icon+' '+esc(f.name)+'</span>',path,()=>moveSelectedTo(ids,f.id,path),'',path);
   });
+  const search=document.createElement('input');
+  search.type='search';
+  search.className='folder-move-search';
+  search.placeholder='Search folders…';
+  search.setAttribute('aria-label','Search folders');
+  search.autocomplete='off';
+  const none=document.createElement('div');
+  none.className='side-small';
+  none.textContent='No matching folders.';
+  none.hidden=true;
+  list.appendChild(none);
+  search.oninput=()=>{
+    const q=search.value.trim().toLowerCase();
+    let shown=0;
+    list.querySelectorAll('.folder-merge-item[data-q]').forEach(r=>{
+      const hit=!q||r.dataset.q.includes(q);
+      r.hidden=!hit;
+      if(hit)shown++;
+    });
+    none.hidden=shown>0;
+  };
+  actions.appendChild(search);
   actions.appendChild(list);
   $('#modal').classList.add('show');
+  setTimeout(()=>{try{search.focus()}catch{}},50);
 }
 async function moveSelectedTo(ids,dest,label){
   $('#modal').classList.remove('show');
