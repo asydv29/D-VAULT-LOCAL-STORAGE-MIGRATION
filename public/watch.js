@@ -1174,6 +1174,13 @@ async function main(){
    setQuality(b.dataset.quality);
  });
 
+ // A recaptured thumbnail: swap the new image into any sidebar/grid card showing that video.
+ window.addEventListener("dvault:thumbnail-ready",async e=>{
+   const tid=String(e.detail?.id||"");if(!tid||!window.DVaultMedia)return;
+   try{const u=await DVaultMedia.thumbnailUrl(tid);if(!u)return;
+     document.querySelectorAll(`[data-rec-id="${CSS.escape(tid)}"] .rec-thumb img`).forEach(img=>{img.src=u});
+   }catch(_){}
+ });
  // Change thumbnail.
  const thumbInput=$("#watchThumbnailInput");
  const prepareThumbnail=async file=>{
@@ -2122,7 +2129,7 @@ async function main(){
    return `<div class="up-next-card" data-rec-id="${esc(x.id)}">
        <a class="rec-thumb-link" href="/watch.html?id=${encodeURIComponent(x.id)}">
          <div class="rec-thumb">
-           <img src="${esc(thumbFor(x))}" alt="" loading="lazy" onerror="window.handleRecThumbFail&&window.handleRecThumbFail(this,'${esc(x.id)}')">
+           <img src="${esc(thumbFor(x))}" alt="" onerror="window.handleRecThumbFail&&window.handleRecThumbFail(this,'${esc(x.id)}')">
            <video class="rec-thumb-preview" muted loop playsinline preload="none" data-local-id="${esc(x.id)}" data-src="${x.preview?.ready&&x.preview?.hover?esc(x.preview.hover):''}" data-src-rev="${x.preview?.ready&&x.preview?.hoverRev?esc(x.preview.hoverRev):''}"></video>
            ${x.isShort?'<span class="short-badge">Shorts</span>':''}
            <span class="rec-play">▶</span>
@@ -2140,6 +2147,7 @@ async function main(){
          <button type="button" data-rec-like="${esc(x.id)}">${x.liked?"👍 Liked":"👍 Like"}</button>
          <button type="button" data-rec-playlist="${esc(x.id)}"><img src="/icons/playlist-icon.png" alt="" class="menu-icon icon-invert"> Save to playlist</button>
          <button type="button" data-rec-thumb="${esc(x.id)}"><img src="/icons/thumbnail-icon.png" alt="" class="menu-icon"> Change thumbnail</button>
+         <button type="button" data-rec-recapture="${esc(x.id)}"><img src="/icons/thumbnail-icon.png" alt="" class="menu-icon"> Recapture thumbnail</button>
          <button type="button" data-rec-rename="${esc(x.id)}">✏️ Rename</button>
          <button type="button" data-rec-savefile="${esc(x.id)}"><img src="/icons/download.png" alt="" class="menu-icon icon-invert"> Download</button>
          <button type="button" data-rec-short="${esc(x.id)}">${x.isShort?'<img src="/icons/remove-from-shorts.svg" alt="" class="menu-icon"> Remove from Shorts':'<img src="/icons/mark-as-shorts.svg" alt="" class="menu-icon"> Mark as Short'}</button>
@@ -2248,7 +2256,7 @@ async function main(){
    return `<div class="rec-card" data-rec-id="${esc(x.id)}">
        <a class="rec-thumb-link" href="/watch.html?id=${encodeURIComponent(x.id)}">
          <div class="rec-thumb">
-           <img src="${esc(thumbFor(x))}" alt="" loading="lazy" onerror="window.handleRecThumbFail&&window.handleRecThumbFail(this,'${esc(x.id)}')">
+           <img src="${esc(thumbFor(x))}" alt="" onerror="window.handleRecThumbFail&&window.handleRecThumbFail(this,'${esc(x.id)}')">
            <video class="rec-thumb-preview" muted loop playsinline preload="none" data-local-id="${esc(x.id)}" data-src="${x.preview?.ready&&x.preview?.hover?esc(x.preview.hover):''}" data-src-rev="${x.preview?.ready&&x.preview?.hoverRev?esc(x.preview.hoverRev):''}"></video>
            ${x.isShort?'<span class="short-badge">Shorts</span>':''}
            <span class="rec-play">▶</span>
@@ -2266,6 +2274,7 @@ async function main(){
          <button type="button" data-rec-like="${esc(x.id)}">${x.liked?"👍 Liked":"👍 Like"}</button>
          <button type="button" data-rec-playlist="${esc(x.id)}"><img src="/icons/playlist-icon.png" alt="" class="menu-icon icon-invert"> Save to playlist</button>
          <button type="button" data-rec-thumb="${esc(x.id)}"><img src="/icons/thumbnail-icon.png" alt="" class="menu-icon"> Change thumbnail</button>
+         <button type="button" data-rec-recapture="${esc(x.id)}"><img src="/icons/thumbnail-icon.png" alt="" class="menu-icon"> Recapture thumbnail</button>
          <button type="button" data-rec-rename="${esc(x.id)}">✏️ Rename</button>
          <button type="button" data-rec-savefile="${esc(x.id)}"><img src="/icons/download.png" alt="" class="menu-icon icon-invert"> Download</button>
          <button type="button" data-rec-short="${esc(x.id)}">${x.isShort?'<img src="/icons/remove-from-shorts.svg" alt="" class="menu-icon"> Remove from Shorts':'<img src="/icons/mark-as-shorts.svg" alt="" class="menu-icon"> Mark as Short'}</button>
@@ -2349,6 +2358,19 @@ async function main(){
      const vid=recDetailsBtn.dataset.recDetails;
      const x=others.find(o=>String(o.id)===String(vid))||(typeof videos!=="undefined"&&videos.find(o=>String(o.id)===String(vid)))||{id:vid};
      if(window.DPDetails)window.DPDetails.open(x);
+     return;
+   }
+   const recaptureBtn=e.target.closest("[data-rec-recapture]");
+   if(recaptureBtn){
+     e.preventDefault();e.stopPropagation();
+     document.querySelectorAll(".card-menu.open").forEach(m=>m.classList.remove("open"));
+     const vid=recaptureBtn.dataset.recRecapture;
+     show("Recapturing thumbnail…");
+     try{
+       if(window.DVaultMedia&&DVaultMedia.forgetThumb)DVaultMedia.forgetThumb(vid);
+       const u=await window.DVaultPreview.ensureThumbnail(vid,true);
+       show(u?"Thumbnail recaptured":"Could not recapture thumbnail");
+     }catch(err){show("Could not recapture thumbnail")}
      return;
    }
    const thumbBtn=e.target.closest("[data-rec-thumb]");

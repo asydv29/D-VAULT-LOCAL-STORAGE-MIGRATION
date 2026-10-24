@@ -58,7 +58,17 @@
   const thumbInflight=new Map();
   function ensureThumbnail(id,force=false){
     if(thumbInflight.has(id))return thumbInflight.get(id);
-    const p=buildThumbnail(id,force).finally(()=>thumbInflight.delete(id));thumbInflight.set(id,p);return p;
+    const p=limitThumb(()=>buildThumbnail(id,force)).finally(()=>thumbInflight.delete(id));thumbInflight.set(id,p);return p;
+  }
+  // Every card's <img> now requests its thumbnail as soon as the page opens (no
+  // lazy loading), so cap how many video frames are decoded at the same time;
+  // the rest wait their turn in the order the cards appear.
+  let thumbRunning=0;const thumbWaiters=[];
+  async function limitThumb(fn){
+    const max=mobileDevice()?4:8;
+    if(thumbRunning>=max)await new Promise(r=>thumbWaiters.push(r));
+    thumbRunning++;
+    try{return await fn()}finally{thumbRunning--;const w=thumbWaiters.shift();if(w)w()}
   }
   // Fast path: sample a few well-spread frames and stop as soon as one is "good
   // enough" (not black/blank, has detail). The result is stored once in
