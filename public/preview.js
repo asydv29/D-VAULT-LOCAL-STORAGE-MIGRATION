@@ -1,7 +1,7 @@
 // DPlayer Universal Preview System
 // One implementation shared by home/search/library cards and watch-page recommendations.
 (function(){
-  let active=null;
+  let active=null,hoverCard=null,touching=false;
   const PREVIEW_SPEED=3; // both forward (start->end) and reverse (end->start) previews run at 3x
 
   const cardSelector='.thumb,.rec-thumb';
@@ -79,6 +79,14 @@
   }
   function previewWindow(d){d=Number(d)||0;if(d<600)return 30;if(d<1200)return 40;if(d<2400)return 50;return 60}
   const warn=(...a)=>{try{console.warn('[DPlayerPreview]',...a)}catch(_){}};
+  // Phones have no console, so failures also show as a short on-screen message.
+  // Open any page once with ?previewdebug=1 to also see step-by-step messages (?previewdebug=0 turns it off).
+  try{const q=new URLSearchParams(location.search).get('previewdebug');if(q==='1')localStorage.setItem('dvPreviewDebug','1');else if(q==='0')localStorage.removeItem('dvPreviewDebug')}catch(_){}
+  let toastEl=null,toastT=null;
+  const notify=msg=>{try{
+    if(!toastEl){toastEl=document.createElement('div');toastEl.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:90vw;background:#222;color:#fff;border:1px solid #444;border-radius:10px;padding:9px 14px;font:13px/1.35 system-ui,sans-serif;z-index:2147483646;pointer-events:none;text-align:center';document.body.appendChild(toastEl)}
+    toastEl.textContent=msg;toastEl.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>{toastEl.style.display='none'},5000)}catch(_){}};
+  const dbg=msg=>{try{if(localStorage.getItem('dvPreviewDebug')==='1')notify('preview: '+msg)}catch(_){}};
   // Starts the real <video> preview. If the clip cannot be opened or played (autoplay blocked,
   // media error, or no first frame within 7 s) the card is reset and onFail(reason) is called so
   // the caller can fall back to the sprite-sheet preview instead of leaving the card blank.
@@ -95,11 +103,11 @@
     const clean=()=>{clearTimeout(wd);vid.removeEventListener('error',onErr)};
     const fail=why=>{
       if(settled)return;settled=true;clean();
-      warn('video preview failed:',why,vid.error?('('+vid.error.code+') '+vid.error.message):'');
+      warn('video preview failed:',why,vid.error?('('+vid.error.code+') '+vid.error.message):'');notify('Video preview failed: '+why+(vid.error?' (code '+vid.error.code+')':''));
       const mine=active?.vid===vid;if(mine)finish();
       if(mine&&onFail)try{onFail(why)}catch(e){warn(e)}
     };
-    vid.addEventListener('error',onErr,{once:true});
+    dbg('starting video preview');vid.addEventListener('error',onErr,{once:true});
     wd=setTimeout(()=>fail('no first frame after 7s'),7000);
     const begin=()=>{try{let s0=Number(startAt)||0;if(!fromRight&&s0>0&&vid.duration&&s0>=vid.duration-1)s0=0;vid.currentTime=Math.max(0,Math.min(s0,(vid.duration||9)-.05))}catch(_){}
       vid.muted=true;vid.playsInline=true;vid.loop=false;vid.defaultPlaybackRate=PREVIEW_SPEED;vid.playbackRate=PREVIEW_SPEED;
@@ -182,39 +190,49 @@
   // Used when the real video cannot be played. Resolves true if a sprite preview started.
   async function spriteFallback(vid,card,startAt,wanted){
     const lid=vid.dataset.localId;
-    if(!lid||!window.DVaultPreview||!DVaultPreview.asset){warn('no sprite fallback available for this card');return false}
+    if(!lid||!window.DVaultPreview||!DVaultPreview.asset){warn('no sprite fallback available for this card');notify('Preview unavailable for this video');return false}
     try{
-      const sp=await getSprite(lid);
-      if(!sp){try{DVaultPreview.prioritizeSprite&&DVaultPreview.prioritizeSprite(lid,0)}catch(_){}warn('sprite sheet not ready yet - building it so the preview works next time');return false}
+      let sp=await getSprite(lid);
+      if(!sp){
+        // Sprite sheet not built yet: build it right now (a few seconds) instead of giving up.
+        warn('sprite sheet not ready - building it now');notify('Preparing preview…');
+        card.classList.add('loading');
+        try{await Promise.race([DVaultPreview.ensureSprite(lid),new Promise(r=>setTimeout(r,25000))])}catch(_){}
+        card.classList.remove('loading');
+        sp=await getSprite(lid);
+      }
+      if(!sp){notify('Preview unavailable: could not build preview frames');return false}
       if(wanted&&!wanted())return false;
       playSprite(vid,card,sp,{startAt});return true;
-    }catch(e){warn('sprite fallback failed:',e);return false}
+    }catch(e){warn('sprite fallback failed:',e);notify('Preview failed: '+(e&&e.message||e));return false}
   }
   // Home/grid hover preview starts only after the pointer rests on a card this long.
   const HOVER_PREVIEW_DELAY_MS=5000;
   // Hover preview begins playing from this point in the video (falls back to 0 for clips this short).
   const HOVER_PREVIEW_START_SEC=5;
   function wire(){
-    const hover=matchMedia('(hover:hover) and (pointer:fine)').matches;
     document.querySelectorAll(cardSelector).forEach(card=>{
       const vid=card.querySelector('.thumb-preview,.rec-thumb-preview');
       if(!vid||(!vid.dataset.src&&!vid.dataset.localId))return;
       // Every card type gets the same progress line element.
       if(!card.querySelector('.thumb-loadbar')){const b=document.createElement('span');b.className='thumb-loadbar';card.appendChild(b)}
-      if(hover){
-        if(vid.dataset.dpHover)return;vid.dataset.dpHover='1';
+      // Mouse hover and touch swipe are both wired on every card (a media query used to pick one,
+      // which left mouse hover dead in desktop-site mode, emulators and some touch laptops).
+      if(!vid.dataset.dpHover){
+        vid.dataset.dpHover='1';
         let timer=null,hovered=false;
         const wanted=()=>hovered&&(!active||active.vid===vid);
-        card.addEventListener('mouseenter',()=>{hovered=true;clearTimeout(timer);if(active?.vid===vid)return;timer=setTimeout(async()=>{card.classList.add('loading');try{
+        card.addEventListener('pointerenter',e=>{if(e.pointerType!=='mouse')return;hovered=true;hoverCard=card;clearTimeout(timer);if(active?.vid===vid)return;timer=setTimeout(async()=>{dbg('hover delay done');card.classList.add('loading');try{
           const src=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):vid.dataset.src;
           if(!src)throw new Error('No local or remote preview source');
           if(!hovered){card.classList.remove('loading');return}
           vid.src=src;vid.preload='auto';card.classList.remove('loading');
           start(vid,card,HOVER_PREVIEW_START_SEC,false,()=>{spriteFallback(vid,card,HOVER_PREVIEW_START_SEC,wanted)});
-        }catch(e){warn('could not open the video for hover preview:',e);card.classList.remove('loading');if(hovered)spriteFallback(vid,card,HOVER_PREVIEW_START_SEC,wanted)}},HOVER_PREVIEW_DELAY_MS)});
-        card.addEventListener('mouseleave',()=>{hovered=false;clearTimeout(timer);if(active?.vid===vid)return;card.classList.remove('loading');if(vid.src){vid.removeAttribute('src');vid.load()}});
-      }else{
-        if(vid.dataset.dpTouch)return;vid.dataset.dpTouch='1';
+        }catch(e){warn('could not open the video for hover preview:',e);notify('Preview: could not open video ('+(e&&e.name||e&&e.message||e)+')');card.classList.remove('loading');if(hovered)spriteFallback(vid,card,HOVER_PREVIEW_START_SEC,wanted)}},HOVER_PREVIEW_DELAY_MS)});
+        card.addEventListener('pointerleave',e=>{if(e.pointerType!=='mouse')return;hovered=false;if(hoverCard===card)hoverCard=null;clearTimeout(timer);if(active?.vid===vid)return;card.classList.remove('loading');if(vid.src){vid.removeAttribute('src');vid.load()}});
+      }
+      if(!vid.dataset.dpTouch){
+        vid.dataset.dpTouch='1';
         // Mobile/tablet: a horizontal swipe on the card starts the preview.
         //   left -> right : plays forward, from the very start to the end
         //   right -> left : plays in reverse, from the very end back to the start
@@ -253,7 +271,7 @@
             const resolved=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):src;
             if(!resolved)throw new Error('No local or remote preview source');
             vid.src=resolved;vid.preload='auto';vid.addEventListener('loadedmetadata',onMeta,{once:true});if(vid.readyState>=1)onMeta();
-          }catch(e){warn('could not open the video for swipe preview:',e);if(my===gid&&onFail)onFail()}};
+          }catch(e){warn('could not open the video for swipe preview:',e);notify('Preview: could not open video ('+(e&&e.name||e&&e.message||e)+')');if(my===gid&&onFail)onFail()}};
           if(!reverse){
             // Forward swipe: start() waits for metadata itself and reports failure, so a
             // blocked/unsupported clip falls back to the sprite preview instead of a blank card.
@@ -264,7 +282,7 @@
               done=true;vid.src=src;vid.preload='auto';
               card.querySelector('.thumb-loadbar')?.classList.remove('from-right');
               start(vid,card,0,false,()=>{spriteFallback(vid,card,0,()=>my===gid)});
-            }catch(e){warn('could not open the video for swipe preview:',e);if(my===gid)spriteFallback(vid,card,0,()=>my===gid)}})();
+            }catch(e){warn('could not open the video for swipe preview:',e);notify('Preview: could not open video ('+(e&&e.name||e&&e.message||e)+')');if(my===gid)spriteFallback(vid,card,0,()=>my===gid)}})();
           }
           else{
             const legacyReverse=()=>{
@@ -313,18 +331,19 @@
             }else legacyReverse();
           }
         };
-        card.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;drag=false},{passive:true});
+        card.addEventListener('touchstart',e=>{touching=true;if(e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;drag=false},{passive:true});
         card.addEventListener('touchmove',e=>{
           if(e.touches.length!==1)return;
           const x=e.touches[0].clientX,y=e.touches[0].clientY,dx=x-sx,dy=y-sy;
-          if(!drag&&Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)){drag=true;e.preventDefault();startSwipePreview(dx<0)}
+          if(!drag&&Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)){drag=true;e.preventDefault();dbg('swipe '+(dx<0?'right-to-left':'left-to-right'));startSwipePreview(dx<0)}
           else if(drag)e.preventDefault();
         },{passive:false});
-        card.addEventListener('touchend',e=>{if(drag){e.preventDefault();drag=false}},{passive:false});
-        card.addEventListener('touchcancel',()=>{drag=false},{passive:true});
+        card.addEventListener('touchend',e=>{touching=false;if(drag){e.preventDefault();drag=false}},{passive:false});
+        card.addEventListener('touchcancel',()=>{touching=false;drag=false},{passive:true});
       }
     });
   }
-  window.DPlayerPreview={wire,stopAll:()=>{if(active)active.stop()}};
+  // True while a preview plays or the pointer/finger is on a card: the page must not rebuild cards then.
+  window.DPlayerPreview={wire,busy:()=>!!(active||hoverCard||touching),stopAll:()=>{if(active)active.stop()}};
   wire();
 })();
