@@ -2,12 +2,15 @@
 // One implementation shared by home/search/library cards and watch-page recommendations.
 (function(){
   let active=null,hoverCard=null,touching=false;
-  const PREVIEW_SPEED=3; // both forward (start->end) and reverse (end->start) previews run at 3x
+  const DEFAULT_PREVIEW_SPEED=3; // both forward (start->end) and reverse (end->start) previews run at 3x
+  // Right-click on a card temporarily switches this to 1x / 3x; stop() puts it back.
+  let PREVIEW_SPEED=DEFAULT_PREVIEW_SPEED;
 
   const cardSelector='.thumb,.rec-thumb';
   function stop(vid,card){
     if(vid._dpEnded){vid.removeEventListener('ended',vid._dpEnded);vid._dpEnded=null}
-    if(active?.vid===vid)active=null;
+    if(active?.vid===vid){active=null;PREVIEW_SPEED=DEFAULT_PREVIEW_SPEED}
+    vid._dpCtx=null;
     card.classList.remove('previewing','loading','scrubbable');
     const bar=card.querySelector('.thumb-loadbar');if(bar){bar.style.width='0';bar.style.transition='none';bar.classList.remove('from-right')}
     card.querySelectorAll('.thumb-rev-canvas,.dv-reverse-canvas').forEach(c=>c.remove());
@@ -229,6 +232,26 @@
           vid.src=src;vid.preload='auto';card.classList.remove('loading');
           start(vid,card,HOVER_PREVIEW_START_SEC,false,()=>{spriteFallback(vid,card,HOVER_PREVIEW_START_SEC,wanted)});
         }catch(e){warn('could not open the video for hover preview:',e);notify('Preview: could not open video ('+(e&&e.name||e&&e.message||e)+')');card.classList.remove('loading');if(hovered)spriteFallback(vid,card,HOVER_PREVIEW_START_SEC,wanted)}},HOVER_PREVIEW_DELAY_MS)});
+        // Right-click (mouse): restart the preview at 1x; right-click again: restart at 3x; and so on.
+        card.addEventListener('pointerdown',e=>{vid._dpPT=e.pointerType},true);
+        card.addEventListener('contextmenu',async e=>{
+          if(vid._dpPT==='touch')return;
+          if(e.target.closest&&e.target.closest('.card-menu,.more-btn,.thumb-scrub,.select-check,input,button'))return;
+          e.preventDefault();e.stopPropagation();
+          const rate=(active?.vid===vid&&vid._dpCtx===1)?3:1;
+          clearTimeout(timer);
+          if(active)active.stop();          // also resets the speed, so set ours afterwards
+          PREVIEW_SPEED=rate;vid._dpCtx=rate;
+          card.classList.add('loading');
+          try{
+            const src=(window.DVaultMedia&&vid.dataset.localId)?await DVaultMedia.url(vid.dataset.localId):vid.dataset.src;
+            if(!src)throw new Error('No local or remote preview source');
+            if(vid._dpCtx!==rate){card.classList.remove('loading');return}
+            vid.src=src;vid.preload='auto';card.classList.remove('loading');
+            start(vid,card,0,false,()=>{spriteFallback(vid,card,0,()=>true)});
+            vid._dpCtx=rate;
+          }catch(err){warn('right-click preview failed:',err);card.classList.remove('loading');PREVIEW_SPEED=DEFAULT_PREVIEW_SPEED;vid._dpCtx=null;spriteFallback(vid,card,0,()=>true)}
+        });
         card.addEventListener('pointerleave',e=>{if(e.pointerType!=='mouse')return;hovered=false;if(hoverCard===card)hoverCard=null;clearTimeout(timer);if(active?.vid===vid)return;card.classList.remove('loading');if(vid.src){vid.removeAttribute('src');vid.load()}});
       }
       if(!vid.dataset.dpTouch){
